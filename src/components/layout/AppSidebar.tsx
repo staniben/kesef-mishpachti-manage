@@ -1,4 +1,3 @@
-
 import { 
   Sidebar, 
   SidebarContent, 
@@ -12,7 +11,7 @@ import {
   SidebarFooter
 } from "@/components/ui/sidebar";
 import { Link } from "react-router-dom";
-import { ChartPie, CreditCard, Plus, Settings, Cash } from "lucide-react";
+import { ChartPie, CreditCard, Plus, Settings, Wallet } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 
 export function AppSidebar() {

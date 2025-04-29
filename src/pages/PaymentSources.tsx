@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PaymentSourceForm } from "@/components/PaymentSourceForm";
 import { PaymentSource } from "@/types";
-import { Plus, Edit, Trash, CreditCard, Cash } from "lucide-react";
+import { Plus, Edit, Trash, CreditCard, Wallet } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function PaymentSources() {
@@ -55,7 +55,7 @@ export default function PaymentSources() {
       case 'credit':
         return <CreditCard className="h-4 w-4" />;
       case 'cash':
-        return <Cash className="h-4 w-4" />;
+        return <Wallet className="h-4 w-4" />;
       default:
         return null;
     }
