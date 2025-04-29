@@ -1,3 +1,4 @@
+
 import { 
   Sidebar, 
   SidebarContent, 
@@ -46,7 +47,7 @@ export function AppSidebar() {
   ];
 
   return (
-    <Sidebar>
+    <Sidebar variant="floating" collapsible="offcanvas">
       <SidebarHeader className="p-4">
         <h2 className="text-lg font-bold">ניהול תקציב</h2>
       </SidebarHeader>
