@@ -9,10 +9,11 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
-  SidebarFooter
+  SidebarFooter,
+  SidebarTrigger
 } from "@/components/ui/sidebar";
 import { Link } from "react-router-dom";
-import { ChartPie, CreditCard, Plus, Settings, Wallet } from "lucide-react";
+import { ChartPie, CreditCard, Plus, Settings, Wallet, X } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 
 export function AppSidebar() {
@@ -48,8 +49,11 @@ export function AppSidebar() {
 
   return (
     <Sidebar variant="floating" collapsible="offcanvas">
-      <SidebarHeader className="p-4">
+      <SidebarHeader className="p-4 flex justify-between items-center">
         <h2 className="text-lg font-bold">ניהול תקציב</h2>
+        <SidebarTrigger className="h-8 w-8">
+          <X className="h-5 w-5" />
+        </SidebarTrigger>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
