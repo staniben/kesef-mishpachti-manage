@@ -3,14 +3,15 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "@/context/AppContext";
 import { useToast } from "@/hooks/use-toast";
-import { Expense } from "@/types";
+import { Expense, PaymentType } from "@/types";
 import { format } from "date-fns";
+import { addMonths } from "date-fns";
 import { createBaseExpense } from "@/utils/expenseUtils";
 
 export function useExpenseForm(editId?: string) {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { categories, paymentSources, expenses, addExpense, updateExpense } = useAppContext();
+  const { categories, paymentSources, expenses, addExpense, updateExpense, addMultipleExpenses } = useAppContext();
   
   const [formData, setFormData] = useState<{
     id: string;
@@ -20,6 +21,11 @@ export function useExpenseForm(editId?: string) {
     name: string;
     categoryId: string;
     paymentSourceId: string;
+    paymentType: PaymentType;
+    // For installment payments
+    totalAmount: string;
+    numberOfInstallments: string;
+    startDate: Date | undefined;
   }>({
     id: "",
     amount: "",
@@ -28,6 +34,10 @@ export function useExpenseForm(editId?: string) {
     name: "",
     categoryId: categories.length > 0 ? categories[0].id : "",
     paymentSourceId: paymentSources.length > 0 ? paymentSources[0].id : "",
+    paymentType: "one-time",
+    totalAmount: "",
+    numberOfInstallments: "3",
+    startDate: new Date(),
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,6 +55,10 @@ export function useExpenseForm(editId?: string) {
           name: expenseToEdit.name,
           categoryId: expenseToEdit.categoryId,
           paymentSourceId: expenseToEdit.paymentSourceId,
+          paymentType: expenseToEdit.paymentType || "one-time",
+          totalAmount: "",
+          numberOfInstallments: "3",
+          startDate: new Date(),
         });
       }
     }
@@ -62,11 +76,19 @@ export function useExpenseForm(editId?: string) {
   const handleDateChange = (date: Date | undefined) => {
     setFormData((prev) => ({ ...prev, date }));
   };
+
+  const handleStartDateChange = (date: Date | undefined) => {
+    setFormData((prev) => ({ ...prev, startDate: date }));
+  };
+
+  const handlePaymentTypeChange = (paymentType: PaymentType) => {
+    setFormData((prev) => ({ ...prev, paymentType }));
+  };
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.date) {
+    if (!formData.date || (formData.paymentType === "installment" && !formData.startDate)) {
       toast({
         title: "שגיאה",
         description: "יש להזין תאריך",
@@ -78,38 +100,10 @@ export function useExpenseForm(editId?: string) {
     setIsSubmitting(true);
     
     try {
-      const totalAmount = parseFloat(formData.amount);
-      if (isNaN(totalAmount) || totalAmount <= 0) {
-        throw new Error("יש להזין סכום חיובי");
-      }
-      
-      // Create the expense object
-      const expense: Expense = createBaseExpense(
-        editId,
-        totalAmount,
-        formData.date,
-        formData.time,
-        formData.name,
-        formData.categoryId,
-        formData.paymentSourceId,
-        "one-time"
-      );
-      
-      if (editId) {
-        // Update existing expense
-        updateExpense(editId, expense);
-        toast({
-          title: "ההוצאה עודכנה",
-          description: "פרטי ההוצאה עודכנו בהצלחה",
-        });
+      if (formData.paymentType === "installment") {
+        handleInstallmentExpense();
       } else {
-        // Add new expense
-        addExpense(expense);
-        
-        toast({
-          title: "ההוצאה נוספה",
-          description: "ההוצאה נוספה בהצלחה",
-        });
+        handleSingleExpense();
       }
       
       // Navigate back to the dashboard after adding/editing
@@ -125,6 +119,93 @@ export function useExpenseForm(editId?: string) {
     }
   };
 
+  const handleSingleExpense = () => {
+    const totalAmount = parseFloat(formData.amount);
+    if (isNaN(totalAmount) || totalAmount <= 0) {
+      throw new Error("יש להזין סכום חיובי");
+    }
+    
+    // Create the expense object
+    const expense: Expense = createBaseExpense(
+      editId,
+      totalAmount,
+      formData.date!,
+      formData.time,
+      formData.name,
+      formData.categoryId,
+      formData.paymentSourceId,
+      formData.paymentType
+    );
+    
+    if (editId) {
+      // Update existing expense
+      updateExpense(editId, expense);
+      toast({
+        title: "ההוצאה עודכנה",
+        description: "פרטי ההוצאה עודכנו בהצלחה",
+      });
+    } else {
+      // Add new expense
+      addExpense(expense);
+      
+      toast({
+        title: "ההוצאה נוספה",
+        description: "ההוצאה נוספה בהצלחה",
+      });
+    }
+  };
+
+  const handleInstallmentExpense = () => {
+    const totalAmount = parseFloat(formData.totalAmount);
+    if (isNaN(totalAmount) || totalAmount <= 0) {
+      throw new Error("יש להזין סכום חיובי");
+    }
+    
+    const installments = parseInt(formData.numberOfInstallments, 10);
+    if (isNaN(installments) || installments < 2) {
+      throw new Error("יש להזין לפחות 2 תשלומים");
+    }
+
+    if (!formData.startDate) {
+      throw new Error("יש להזין תאריך התחלה");
+    }
+    
+    // Calculate monthly amount
+    const monthlyAmount = totalAmount / installments;
+    
+    // Create multiple expenses for each installment
+    const installmentExpenses: Expense[] = [];
+    
+    for (let i = 0; i < installments; i++) {
+      const installmentDate = addMonths(formData.startDate, i);
+      const formattedDate = format(installmentDate, "yyyy-MM-dd");
+      
+      const expense: Expense = {
+        id: new Date().getTime().toString() + "-" + i, // Ensure unique IDs for each installment
+        amount: monthlyAmount,
+        date: formattedDate,
+        time: formData.time,
+        name: `${formData.name} (${i+1}/${installments})`,
+        categoryId: formData.categoryId,
+        paymentSourceId: formData.paymentSourceId,
+        paymentType: "installment",
+        installmentNumber: i + 1,
+        totalInstallments: installments,
+        isInstallment: true,
+      };
+      
+      installmentExpenses.push(expense);
+    }
+    
+    // Add all installment expenses
+    addMultipleExpenses(installmentExpenses);
+    
+    toast({
+      title: "התשלומים נוספו",
+      description: `נוספו ${installments} תשלומים בהצלחה`,
+    });
+  };
+
   return {
     formData,
     isSubmitting,
@@ -133,6 +214,8 @@ export function useExpenseForm(editId?: string) {
     handleChange,
     handleSelectChange,
     handleDateChange,
+    handleStartDateChange,
+    handlePaymentTypeChange,
     handleSubmit
   };
 }

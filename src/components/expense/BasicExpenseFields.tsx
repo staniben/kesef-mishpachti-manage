@@ -13,6 +13,7 @@ interface BasicExpenseFieldsProps {
   paymentSources: PaymentSource[];
   onInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSelectChange: (name: string, value: string) => void;
+  disableAmount?: boolean;
 }
 
 export function BasicExpenseFields({
@@ -23,7 +24,8 @@ export function BasicExpenseFields({
   categories,
   paymentSources,
   onInputChange,
-  onSelectChange
+  onSelectChange,
+  disableAmount = false
 }: BasicExpenseFieldsProps) {
   return (
     <>
@@ -39,20 +41,22 @@ export function BasicExpenseFields({
         />
       </div>
       
-      <div className="space-y-2">
-        <Label htmlFor="amount">סכום (₪)</Label>
-        <Input
-          id="amount"
-          name="amount"
-          type="number"
-          value={amount}
-          onChange={onInputChange}
-          placeholder="הזן סכום"
-          min="0"
-          step="0.01"
-          required
-        />
-      </div>
+      {!disableAmount && (
+        <div className="space-y-2">
+          <Label htmlFor="amount">סכום (₪)</Label>
+          <Input
+            id="amount"
+            name="amount"
+            type="number"
+            value={amount}
+            onChange={onInputChange}
+            placeholder="הזן סכום"
+            min="0"
+            step="0.01"
+            required={!disableAmount}
+          />
+        </div>
+      )}
       
       <div className="space-y-2">
         <Label htmlFor="categoryId">קטגוריה</Label>

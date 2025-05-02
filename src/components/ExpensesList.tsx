@@ -2,6 +2,7 @@
 import { useAppContext } from "@/context/AppContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Edit, Trash } from "lucide-react";
 import { ExpenseCategory, PaymentSource } from "@/types";
 
@@ -82,6 +83,7 @@ export function ExpensesList({ filterId, filterType, onEditExpense }: ExpensesLi
               <TableHead>קטגוריה</TableHead>
               <TableHead>אמצעי תשלום</TableHead>
               <TableHead>סכום</TableHead>
+              <TableHead>סוג</TableHead>
               <TableHead>פעולות</TableHead>
             </TableRow>
           </TableHeader>
@@ -93,6 +95,21 @@ export function ExpensesList({ filterId, filterType, onEditExpense }: ExpensesLi
                 <TableCell>{getCategoryName(expense.categoryId)}</TableCell>
                 <TableCell>{getPaymentSourceName(expense.paymentSourceId)}</TableCell>
                 <TableCell className="font-medium">₪ {expense.amount.toLocaleString()}</TableCell>
+                <TableCell>
+                  {expense.isInstallment && expense.installmentNumber && expense.totalInstallments ? (
+                    <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-300">
+                      תשלום {expense.installmentNumber} מתוך {expense.totalInstallments}
+                    </Badge>
+                  ) : expense.paymentType === "recurring" ? (
+                    <Badge variant="outline" className="bg-purple-50 text-purple-600 border-purple-300">
+                      תשלום קבוע
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-green-50 text-green-600 border-green-300">
+                      חד פעמי
+                    </Badge>
+                  )}
+                </TableCell>
                 <TableCell>
                   <div className="flex gap-2">
                     {onEditExpense && (

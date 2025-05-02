@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { ThemeType, ExpenseCategory, PaymentSource, Expense, PaymentType } from '@/types';
 
@@ -14,6 +15,7 @@ interface AppContextType {
   deletePaymentSource: (id: string) => void;
   expenses: Expense[];
   addExpense: (expense: Expense) => void;
+  addMultipleExpenses: (expenses: Expense[]) => void;
   updateExpense: (id: string, expense: Partial<Expense>) => void;
   deleteExpense: (id: string) => void;
   currentMonth: number;
@@ -149,6 +151,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     setExpenses([...expenses, expense]);
   };
 
+  const addMultipleExpenses = (newExpenses: Expense[]) => {
+    setExpenses([...expenses, ...newExpenses]);
+  };
+
   const updateExpense = (id: string, updatedExpense: Partial<Expense>) => {
     setExpenses(
       expenses.map((expense) =>
@@ -174,6 +180,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     deletePaymentSource,
     expenses,
     addExpense,
+    addMultipleExpenses,
     updateExpense,
     deleteExpense,
     currentMonth,

@@ -16,6 +16,7 @@ interface DateTimeInputsProps {
   label?: string;
   dateLabel?: string;
   timeLabel?: string;
+  hideTime?: boolean;
 }
 
 export function DateTimeInputs({
@@ -26,12 +27,13 @@ export function DateTimeInputs({
   label = "תאריך ושעה",
   dateLabel = "תאריך",
   timeLabel = "שעה",
+  hideTime = false,
 }: DateTimeInputsProps) {
   return (
     <>
       {label && <div className="text-sm font-medium mb-2">{label}</div>}
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className={cn("grid gap-4", hideTime ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2")}>
         <div className="space-y-2">
           <Label>{dateLabel}</Label>
           <Popover>
@@ -59,16 +61,18 @@ export function DateTimeInputs({
           </Popover>
         </div>
         
-        <div className="space-y-2">
-          <Label htmlFor="time">{timeLabel}</Label>
-          <Input
-            id="time"
-            name="time"
-            type="time"
-            value={time}
-            onChange={onTimeChange}
-          />
-        </div>
+        {!hideTime && (
+          <div className="space-y-2">
+            <Label htmlFor="time">{timeLabel}</Label>
+            <Input
+              id="time"
+              name="time"
+              type="time"
+              value={time}
+              onChange={onTimeChange}
+            />
+          </div>
+        )}
       </div>
     </>
   );
