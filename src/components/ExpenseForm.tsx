@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "@/context/AppContext";
@@ -8,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Expense, PaymentType } from "@/types";
-import { format } from "date-fns";
+import { format, addMonths } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon } from "lucide-react";
@@ -127,16 +126,28 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
       }
       
       if (editId) {
+        // When editing, just update the single expense
         updateExpense(editId, expenseData);
         toast({
           title: "ההוצאה עודכנה",
           description: "פרטי ההוצאה עודכנו בהצלחה",
         });
       } else {
+        // For new expenses, handle according to payment type
         addExpense(expenseData);
+        
+        // Generate additional expenses for installments and recurring payments
+        if (formData.paymentType === "installments") {
+          generateInstallmentExpenses(expenseData);
+        } else if (formData.paymentType === "recurring") {
+          generateRecurringExpenses(expenseData);
+        }
+        
         toast({
           title: "ההוצאה נוספה",
-          description: "ההוצאה נוספה בהצלחה",
+          description: formData.paymentType !== "one-time" 
+            ? "ההוצאה והתשלומים העתידיים נוספו בהצלחה" 
+            : "ההוצאה נוספה בהצלחה",
         });
       }
       
@@ -149,6 +160,70 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
       });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+  
+  // Function to generate installment expenses
+  const generateInstallmentExpenses = (baseExpense: Expense) => {
+    const totalAmount = baseExpense.amount;
+    const totalInstallments = baseExpense.totalInstallments || 1;
+    
+    // Skip the first payment as it's already added
+    for (let i = 1; i < totalInstallments; i++) {
+      const installmentAmount = parseFloat((totalAmount / totalInstallments).toFixed(2));
+      const installmentDate = addMonths(new Date(baseExpense.date), i);
+      
+      const installmentExpense: Expense = {
+        id: new Date().getTime().toString() + i, // Unique ID
+        amount: installmentAmount,
+        date: format(installmentDate, "yyyy-MM-dd"),
+        time: baseExpense.time,
+        name: `${baseExpense.name} (${i + 1}/${totalInstallments})`,
+        categoryId: baseExpense.categoryId,
+        paymentSourceId: baseExpense.paymentSourceId,
+        paymentType: "installments",
+        installmentNumber: i + 1,
+        totalInstallments: totalInstallments,
+        isInstallment: true, // Mark as installment for display purposes
+        relatedExpenseId: baseExpense.id, // Link to original expense
+      };
+      
+      addExpense(installmentExpense);
+    }
+  };
+  
+  // Function to generate recurring expenses
+  const generateRecurringExpenses = (baseExpense: Expense) => {
+    // Default to 12 months if no end date is provided
+    const endDate = baseExpense.recurringEndDate 
+      ? new Date(baseExpense.recurringEndDate)
+      : addMonths(new Date(baseExpense.date), 12);
+    
+    const startDate = new Date(baseExpense.date);
+    let currentDate = addMonths(startDate, 1); // Start from next month
+    let counter = 1;
+    
+    // Generate recurring expenses until end date or max 12 months
+    while (currentDate <= endDate && counter <= 12) {
+      const recurringExpense: Expense = {
+        id: new Date().getTime().toString() + counter,
+        amount: baseExpense.amount,
+        date: format(currentDate, "yyyy-MM-dd"),
+        time: baseExpense.time,
+        name: `${baseExpense.name} (חודשי ${counter + 1})`,
+        categoryId: baseExpense.categoryId,
+        paymentSourceId: baseExpense.paymentSourceId,
+        paymentType: "recurring",
+        recurringEndDate: baseExpense.recurringEndDate,
+        isRecurring: true, // Mark as recurring for display purposes
+        recurrenceType: "monthly",
+        relatedExpenseId: baseExpense.id, // Link to original expense
+      };
+      
+      addExpense(recurringExpense);
+      
+      currentDate = addMonths(currentDate, 1);
+      counter++;
     }
   };
   

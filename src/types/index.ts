@@ -28,6 +28,11 @@ export type Expense = {
   // For installments
   installmentNumber?: number;
   totalInstallments?: number;
+  isInstallment?: boolean;
   // For recurring
   recurringEndDate?: string;
+  isRecurring?: boolean;
+  recurrenceType?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  // For linking related expenses
+  relatedExpenseId?: string;
 };
