@@ -78,8 +78,7 @@ const initialExpenses: Expense[] = [
     name: 'חשבון חשמל',
     categoryId: '4',
     paymentSourceId: '3',
-    paymentType: 'recurring',
-    recurringEndDate: '2026-04-20',
+    paymentType: 'one-time',
   },
   {
     id: '5',

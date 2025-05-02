@@ -14,7 +14,7 @@ export type PaymentSource = {
   color?: string;
 };
 
-export type PaymentType = 'one-time' | 'recurring';
+export type PaymentType = 'one-time';
 
 export type Expense = {
   id: string;
@@ -25,10 +25,6 @@ export type Expense = {
   categoryId: string;
   paymentSourceId: string;
   paymentType: PaymentType;
-  // For recurring
-  recurringEndDate?: string;
-  isRecurring?: boolean;
-  recurrenceType?: 'daily' | 'weekly' | 'monthly' | 'yearly';
   // For linking related expenses
   relatedExpenseId?: string;
 };

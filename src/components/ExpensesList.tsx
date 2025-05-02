@@ -3,7 +3,7 @@ import { useAppContext } from "@/context/AppContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Edit, Trash } from "lucide-react";
-import { ExpenseCategory, PaymentSource, PaymentType } from "@/types";
+import { ExpenseCategory, PaymentSource } from "@/types";
 
 type ExpensesListProps = {
   filterId?: string;
@@ -47,18 +47,6 @@ export function ExpensesList({ filterId, filterType, onEditExpense }: ExpensesLi
     return source?.name || "לא מוגדר";
   };
   
-  // Helper function to format payment type
-  const formatPaymentType = (type: PaymentType): string => {
-    switch (type) {
-      case "one-time":
-        return "חד פעמי";
-      case "recurring":
-        return "תשלום קבוע";
-      default:
-        return "";
-    }
-  };
-  
   // Handle delete expense
   const handleDelete = (id: string) => {
     if (window.confirm("האם אתה בטוח שברצונך למחוק הוצאה זו?")) {
@@ -93,7 +81,6 @@ export function ExpensesList({ filterId, filterType, onEditExpense }: ExpensesLi
               <TableHead>שם</TableHead>
               <TableHead>קטגוריה</TableHead>
               <TableHead>אמצעי תשלום</TableHead>
-              <TableHead>סוג תשלום</TableHead>
               <TableHead>סכום</TableHead>
               <TableHead>פעולות</TableHead>
             </TableRow>
@@ -105,7 +92,6 @@ export function ExpensesList({ filterId, filterType, onEditExpense }: ExpensesLi
                 <TableCell>{expense.name}</TableCell>
                 <TableCell>{getCategoryName(expense.categoryId)}</TableCell>
                 <TableCell>{getPaymentSourceName(expense.paymentSourceId)}</TableCell>
-                <TableCell>{formatPaymentType(expense.paymentType)}</TableCell>
                 <TableCell className="font-medium">₪ {expense.amount.toLocaleString()}</TableCell>
                 <TableCell>
                   <div className="flex gap-2">

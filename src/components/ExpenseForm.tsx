@@ -4,12 +4,11 @@ import { useNavigate } from "react-router-dom";
 import { useAppContext } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Expense, PaymentType } from "@/types";
+import { Expense } from "@/types";
 import { format } from "date-fns";
 import { BasicExpenseFields } from "./expense/BasicExpenseFields";
 import { DateTimeInputs } from "./expense/DateTimeInputs";
-import { RecurringFields } from "./expense/RecurringFields";
-import { createBaseExpense, generateRecurringExpenses } from "@/utils/expenseUtils";
+import { createBaseExpense } from "@/utils/expenseUtils";
 
 interface ExpenseFormProps {
   editId?: string;
@@ -28,8 +27,6 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
     name: string;
     categoryId: string;
     paymentSourceId: string;
-    paymentType: PaymentType;
-    recurringEndDate: Date | undefined;
   }>({
     id: "",
     amount: "",
@@ -38,8 +35,6 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
     name: "",
     categoryId: categories.length > 0 ? categories[0].id : "",
     paymentSourceId: paymentSources.length > 0 ? paymentSources[0].id : "",
-    paymentType: "one-time",
-    recurringEndDate: undefined,
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -57,10 +52,6 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
           name: expenseToEdit.name,
           categoryId: expenseToEdit.categoryId,
           paymentSourceId: expenseToEdit.paymentSourceId,
-          paymentType: expenseToEdit.paymentType,
-          recurringEndDate: expenseToEdit.recurringEndDate 
-            ? new Date(expenseToEdit.recurringEndDate) 
-            : undefined,
         });
       }
     }
@@ -77,10 +68,6 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
   
   const handleDateChange = (date: Date | undefined) => {
     setFormData((prev) => ({ ...prev, date }));
-  };
-  
-  const handleRecurringEndDateChange = (date: Date | undefined) => {
-    setFormData((prev) => ({ ...prev, recurringEndDate: date }));
   };
   
   const handleSubmit = (e: React.FormEvent) => {
@@ -103,8 +90,8 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
         throw new Error("יש להזין סכום חיובי");
       }
       
-      // Create the base expense object
-      const baseExpense: Expense = createBaseExpense(
+      // Create the expense object
+      const expense: Expense = createBaseExpense(
         editId,
         totalAmount,
         formData.date,
@@ -112,40 +99,24 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
         formData.name,
         formData.categoryId,
         formData.paymentSourceId,
-        formData.paymentType
+        "one-time"
       );
       
       if (editId) {
-        // When editing, just update the single expense
-        updateExpense(editId, baseExpense);
+        // Update existing expense
+        updateExpense(editId, expense);
         toast({
           title: "ההוצאה עודכנה",
           description: "פרטי ההוצאה עודכנו בהצלחה",
         });
       } else {
-        // For new expenses, handle according to payment type
-        if (formData.paymentType === "recurring") {
-          // Generate and save all recurring expenses
-          const recurringExpenses = generateRecurringExpenses(baseExpense);
-          
-          // Add all recurring expenses to the database
-          recurringExpenses.forEach(expense => {
-            addExpense(expense);
-          });
-          
-          toast({
-            title: "ההוצאות החוזרות נוספו",
-            description: "נוספו 12 הוצאות חודשיות בהצלחה",
-          });
-        } else {
-          // One-time expense - just add it as is
-          addExpense(baseExpense);
-          
-          toast({
-            title: "ההוצאה נוספה",
-            description: "ההוצאה נוספה בהצלחה",
-          });
-        }
+        // Add new expense
+        addExpense(expense);
+        
+        toast({
+          title: "ההוצאה נוספה",
+          description: "ההוצאה נוספה בהצלחה",
+        });
       }
       
       // Navigate back to the dashboard after adding/editing
@@ -171,7 +142,6 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
           amount={formData.amount}
           categoryId={formData.categoryId}
           paymentSourceId={formData.paymentSourceId}
-          paymentType={formData.paymentType}
           categories={categories}
           paymentSources={paymentSources}
           onInputChange={handleChange}
@@ -184,14 +154,6 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
           onDateChange={handleDateChange}
           onTimeChange={handleChange}
         />
-        
-        {formData.paymentType === "recurring" && (
-          <RecurringFields
-            recurringEndDate={formData.recurringEndDate}
-            startDate={formData.date}
-            onRecurringEndDateChange={handleRecurringEndDateChange}
-          />
-        )}
       </div>
       
       <div className="flex justify-end gap-4 pt-4">

@@ -2,14 +2,13 @@
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ExpenseCategory, PaymentSource, PaymentType } from "@/types";
+import { ExpenseCategory, PaymentSource } from "@/types";
 
 interface BasicExpenseFieldsProps {
   name: string;
   amount: string;
   categoryId: string;
   paymentSourceId: string;
-  paymentType: PaymentType;
   categories: ExpenseCategory[];
   paymentSources: PaymentSource[];
   onInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -21,7 +20,6 @@ export function BasicExpenseFields({
   amount,
   categoryId,
   paymentSourceId,
-  paymentType,
   categories,
   paymentSources,
   onInputChange,
@@ -90,22 +88,6 @@ export function BasicExpenseFields({
                 {source.name}
               </SelectItem>
             ))}
-          </SelectContent>
-        </Select>
-      </div>
-      
-      <div className="space-y-2">
-        <Label htmlFor="paymentType">סוג תשלום</Label>
-        <Select
-          value={paymentType}
-          onValueChange={(value) => onSelectChange("paymentType", value as PaymentType)}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="בחר סוג תשלום" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="one-time">חד פעמי</SelectItem>
-            <SelectItem value="recurring">תשלום קבוע</SelectItem>
           </SelectContent>
         </Select>
       </div>
