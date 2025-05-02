@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { ThemeType, ExpenseCategory, PaymentSource, Expense, PaymentType } from '@/types';
 
@@ -90,9 +89,7 @@ const initialExpenses: Expense[] = [
     name: 'טלוויזיה חדשה',
     categoryId: '5',
     paymentSourceId: '2',
-    paymentType: 'installments',
-    installmentNumber: 1,
-    totalInstallments: 12,
+    paymentType: 'one-time',
   },
 ];
 

@@ -48,14 +48,12 @@ export function ExpensesList({ filterId, filterType, onEditExpense }: ExpensesLi
   };
   
   // Helper function to format payment type
-  const formatPaymentType = (type: PaymentType, expense: any): string => {
+  const formatPaymentType = (type: PaymentType): string => {
     switch (type) {
       case "one-time":
         return "חד פעמי";
       case "recurring":
         return "תשלום קבוע";
-      case "installments":
-        return `תשלום ${expense.installmentNumber} מתוך ${expense.totalInstallments}`;
       default:
         return "";
     }
@@ -107,7 +105,7 @@ export function ExpensesList({ filterId, filterType, onEditExpense }: ExpensesLi
                 <TableCell>{expense.name}</TableCell>
                 <TableCell>{getCategoryName(expense.categoryId)}</TableCell>
                 <TableCell>{getPaymentSourceName(expense.paymentSourceId)}</TableCell>
-                <TableCell>{formatPaymentType(expense.paymentType, expense)}</TableCell>
+                <TableCell>{formatPaymentType(expense.paymentType)}</TableCell>
                 <TableCell className="font-medium">₪ {expense.amount.toLocaleString()}</TableCell>
                 <TableCell>
                   <div className="flex gap-2">
