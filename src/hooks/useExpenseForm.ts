@@ -3,31 +3,23 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "@/context/AppContext";
 import { useToast } from "@/hooks/use-toast";
-import { Expense, PaymentType, RecurrenceType } from "@/types";
+import { PaymentType } from "@/types";
 import { format } from "date-fns";
-import { addMonths } from "date-fns";
-import { createBaseExpense } from "@/utils/expenseUtils";
-import { v4 as uuidv4 } from 'uuid';
+import { ExpenseFormData } from "./expense/expenseFormTypes";
+import { useSingleExpenseHandler } from "./expense/useSingleExpenseHandler";
+import { useInstallmentExpenseHandler } from "./expense/useInstallmentExpenseHandler";
+import { useRecurringExpenseHandler } from "./expense/useRecurringExpenseHandler";
 
 export function useExpenseForm(editId?: string) {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { categories, paymentSources, expenses, addExpense, updateExpense, addMultipleExpenses } = useAppContext();
   
-  const [formData, setFormData] = useState<{
-    id: string;
-    amount: string;
-    date: Date | undefined;
-    time: string;
-    name: string;
-    categoryId: string;
-    paymentSourceId: string;
-    paymentType: PaymentType;
-    // For installment payments
-    totalAmount: string;
-    numberOfInstallments: string;
-    startDate: Date | undefined;
-  }>({
+  const { handleSingleExpense } = useSingleExpenseHandler();
+  const { handleInstallmentExpense } = useInstallmentExpenseHandler();
+  const { handleRecurringExpense } = useRecurringExpenseHandler();
+  
+  const [formData, setFormData] = useState<ExpenseFormData>({
     id: "",
     amount: "",
     date: new Date(),
@@ -102,11 +94,40 @@ export function useExpenseForm(editId?: string) {
     
     try {
       if (formData.paymentType === "installment") {
-        handleInstallmentExpense();
+        const installmentExpenses = handleInstallmentExpense(formData);
+        addMultipleExpenses(installmentExpenses);
+        
+        toast({
+          title: "התשלומים נוספו",
+          description: `נוספו ${installmentExpenses.length} תשלומים בהצלחה`,
+        });
       } else if (formData.paymentType === "recurring") {
-        handleRecurringExpense();
+        const recurringExpenses = handleRecurringExpense(formData);
+        addMultipleExpenses(recurringExpenses);
+        
+        toast({
+          title: "התשלומים הקבועים נוספו",
+          description: "נוספו 12 תשלומים קבועים בהצלחה",
+        });
       } else {
-        handleSingleExpense();
+        const expense = handleSingleExpense(formData, editId);
+        
+        if (editId) {
+          // Update existing expense
+          updateExpense(editId, expense);
+          toast({
+            title: "ההוצאה עודכנה",
+            description: "פרטי ההוצאה עודכנו בהצלחה",
+          });
+        } else {
+          // Add new expense
+          addExpense(expense);
+          
+          toast({
+            title: "ההוצאה נוספה",
+            description: "ההוצאה נוספה בהצלחה",
+          });
+        }
       }
       
       // Navigate back to the dashboard after adding/editing
@@ -120,140 +141,6 @@ export function useExpenseForm(editId?: string) {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleSingleExpense = () => {
-    const totalAmount = parseFloat(formData.amount);
-    if (isNaN(totalAmount) || totalAmount <= 0) {
-      throw new Error("יש להזין סכום חיובי");
-    }
-    
-    // Create the expense object
-    const expense: Expense = createBaseExpense(
-      editId,
-      totalAmount,
-      formData.date!,
-      formData.time,
-      formData.name,
-      formData.categoryId,
-      formData.paymentSourceId,
-      formData.paymentType
-    );
-    
-    if (editId) {
-      // Update existing expense
-      updateExpense(editId, expense);
-      toast({
-        title: "ההוצאה עודכנה",
-        description: "פרטי ההוצאה עודכנו בהצלחה",
-      });
-    } else {
-      // Add new expense
-      addExpense(expense);
-      
-      toast({
-        title: "ההוצאה נוספה",
-        description: "ההוצאה נוספה בהצלחה",
-      });
-    }
-  };
-
-  const handleInstallmentExpense = () => {
-    const totalAmount = parseFloat(formData.totalAmount);
-    if (isNaN(totalAmount) || totalAmount <= 0) {
-      throw new Error("יש להזין סכום חיובי");
-    }
-    
-    const installments = parseInt(formData.numberOfInstallments, 10);
-    if (isNaN(installments) || installments < 2) {
-      throw new Error("יש להזין לפחות 2 תשלומים");
-    }
-
-    if (!formData.startDate) {
-      throw new Error("יש להזין תאריך התחלה");
-    }
-    
-    // Calculate monthly amount
-    const monthlyAmount = totalAmount / installments;
-    
-    // Create multiple expenses for each installment
-    const installmentExpenses: Expense[] = [];
-    
-    for (let i = 0; i < installments; i++) {
-      const installmentDate = addMonths(formData.startDate, i);
-      const formattedDate = format(installmentDate, "yyyy-MM-dd");
-      
-      const expense: Expense = {
-        id: new Date().getTime().toString() + "-" + i, // Ensure unique IDs for each installment
-        amount: monthlyAmount,
-        date: formattedDate,
-        time: formData.time,
-        name: `${formData.name} (${i+1}/${installments})`,
-        categoryId: formData.categoryId,
-        paymentSourceId: formData.paymentSourceId,
-        paymentType: "installment",
-        installmentNumber: i + 1,
-        totalInstallments: installments,
-        isInstallment: true,
-      };
-      
-      installmentExpenses.push(expense);
-    }
-    
-    // Add all installment expenses
-    addMultipleExpenses(installmentExpenses);
-    
-    toast({
-      title: "התשלומים נוספו",
-      description: `נוספו ${installments} תשלומים בהצלחה`,
-    });
-  };
-
-  const handleRecurringExpense = () => {
-    const amount = parseFloat(formData.amount);
-    if (isNaN(amount) || amount <= 0) {
-      throw new Error("יש להזין סכום חיובי");
-    }
-
-    if (!formData.startDate) {
-      throw new Error("יש להזין תאריך התחלה");
-    }
-    
-    // Generate a unique recurrence ID
-    const recurrenceId = uuidv4();
-    const recurrenceType: RecurrenceType = "monthly";
-    
-    // Create 12 monthly recurring expenses
-    const recurringExpenses: Expense[] = [];
-    
-    for (let i = 0; i < 12; i++) {
-      const recurringDate = addMonths(formData.startDate, i);
-      const formattedDate = format(recurringDate, "yyyy-MM-dd");
-      
-      const expense: Expense = {
-        id: new Date().getTime().toString() + "-recurring-" + i, // Ensure unique IDs
-        amount: amount,
-        date: formattedDate,
-        time: formData.time,
-        name: formData.name,
-        categoryId: formData.categoryId,
-        paymentSourceId: formData.paymentSourceId,
-        paymentType: "recurring",
-        isRecurring: true,
-        recurrenceId: recurrenceId,
-        recurrenceType: recurrenceType
-      };
-      
-      recurringExpenses.push(expense);
-    }
-    
-    // Add all recurring expenses
-    addMultipleExpenses(recurringExpenses);
-    
-    toast({
-      title: "התשלומים הקבועים נוספו",
-      description: "נוספו 12 תשלומים קבועים בהצלחה",
-    });
   };
 
   return {
