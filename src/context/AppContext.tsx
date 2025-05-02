@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { ThemeType, ExpenseCategory, PaymentSource, Expense, PaymentType } from '@/types';
 

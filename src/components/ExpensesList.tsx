@@ -100,10 +100,6 @@ export function ExpensesList({ filterId, filterType, onEditExpense }: ExpensesLi
                     <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-300">
                       תשלום {expense.installmentNumber} מתוך {expense.totalInstallments}
                     </Badge>
-                  ) : expense.paymentType === "recurring" ? (
-                    <Badge variant="outline" className="bg-purple-50 text-purple-600 border-purple-300">
-                      תשלום קבוע
-                    </Badge>
                   ) : (
                     <Badge variant="outline" className="bg-green-50 text-green-600 border-green-300">
                       חד פעמי

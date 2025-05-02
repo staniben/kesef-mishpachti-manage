@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "@/context/AppContext";
@@ -55,7 +54,7 @@ export function useExpenseForm(editId?: string) {
           name: expenseToEdit.name,
           categoryId: expenseToEdit.categoryId,
           paymentSourceId: expenseToEdit.paymentSourceId,
-          paymentType: expenseToEdit.paymentType || "one-time",
+          paymentType: expenseToEdit.paymentType === "one-time" ? "one-time" : "installment",
           totalAmount: "",
           numberOfInstallments: "3",
           startDate: new Date(),

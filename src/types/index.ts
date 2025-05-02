@@ -14,7 +14,7 @@ export type PaymentSource = {
   color?: string;
 };
 
-export type PaymentType = 'one-time' | 'installment' | 'recurring';
+export type PaymentType = 'one-time' | 'installment';
 
 export type Expense = {
   id: string;
