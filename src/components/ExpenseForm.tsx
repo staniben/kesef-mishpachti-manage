@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "@/context/AppContext";
@@ -106,6 +107,7 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
     setIsSubmitting(true);
     
     try {
+      // For installments, this is the first payment
       const expenseData: Expense = {
         id: editId || new Date().getTime().toString(),
         amount: parseFloat(formData.amount),
@@ -119,10 +121,19 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
       
       // Add additional fields based on payment type
       if (formData.paymentType === "installments") {
-        expenseData.installmentNumber = parseInt(formData.installmentNumber);
-        expenseData.totalInstallments = parseInt(formData.totalInstallments);
+        const totalInstallments = parseInt(formData.totalInstallments || "1");
+        const installmentAmount = parseFloat((parseFloat(formData.amount) / totalInstallments).toFixed(2));
+        
+        // Update the first payment amount and add installment details
+        expenseData.amount = installmentAmount;
+        expenseData.installmentNumber = 1;
+        expenseData.totalInstallments = totalInstallments;
+        expenseData.isInstallment = true;
+        expenseData.name = `${formData.name} (1/${totalInstallments})`;
       } else if (formData.paymentType === "recurring" && formData.recurringEndDate) {
         expenseData.recurringEndDate = format(formData.recurringEndDate, "yyyy-MM-dd");
+        expenseData.isRecurring = true;
+        expenseData.recurrenceType = "monthly";
       }
       
       if (editId) {
@@ -165,12 +176,11 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
   
   // Function to generate installment expenses
   const generateInstallmentExpenses = (baseExpense: Expense) => {
-    const totalAmount = baseExpense.amount;
     const totalInstallments = baseExpense.totalInstallments || 1;
+    const installmentAmount = baseExpense.amount; // Amount per installment already calculated
     
-    // Skip the first payment as it's already added
+    // Generate future installments (starting from the 2nd installment)
     for (let i = 1; i < totalInstallments; i++) {
-      const installmentAmount = parseFloat((totalAmount / totalInstallments).toFixed(2));
       const installmentDate = addMonths(new Date(baseExpense.date), i);
       
       const installmentExpense: Expense = {
@@ -178,13 +188,13 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
         amount: installmentAmount,
         date: format(installmentDate, "yyyy-MM-dd"),
         time: baseExpense.time,
-        name: `${baseExpense.name} (${i + 1}/${totalInstallments})`,
+        name: `${baseExpense.name.split(' (')[0]} (${i + 1}/${totalInstallments})`, // Clean name and add installment number
         categoryId: baseExpense.categoryId,
         paymentSourceId: baseExpense.paymentSourceId,
         paymentType: "installments",
         installmentNumber: i + 1,
         totalInstallments: totalInstallments,
-        isInstallment: true, // Mark as installment for display purposes
+        isInstallment: true,
         relatedExpenseId: baseExpense.id, // Link to original expense
       };
       
@@ -215,9 +225,9 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
         paymentSourceId: baseExpense.paymentSourceId,
         paymentType: "recurring",
         recurringEndDate: baseExpense.recurringEndDate,
-        isRecurring: true, // Mark as recurring for display purposes
+        isRecurring: true,
         recurrenceType: "monthly",
-        relatedExpenseId: baseExpense.id, // Link to original expense
+        relatedExpenseId: baseExpense.id,
       };
       
       addExpense(recurringExpense);
