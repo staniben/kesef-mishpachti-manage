@@ -3,16 +3,14 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "@/context/AppContext";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Expense, PaymentType } from "@/types";
-import { format, addMonths } from "date-fns";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { BasicExpenseFields } from "./expense/BasicExpenseFields";
+import { DateTimeInputs } from "./expense/DateTimeInputs";
+import { InstallmentFields } from "./expense/InstallmentFields";
+import { RecurringFields } from "./expense/RecurringFields";
+import { createBaseExpense, generateInstallmentExpenses, generateRecurringExpenses } from "@/utils/expenseUtils";
 
 interface ExpenseFormProps {
   editId?: string;
@@ -108,16 +106,16 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
     
     try {
       // For installments, this is the first payment
-      const expenseData: Expense = {
-        id: editId || new Date().getTime().toString(),
-        amount: parseFloat(formData.amount),
-        date: format(formData.date, "yyyy-MM-dd"),
-        time: formData.time,
-        name: formData.name,
-        categoryId: formData.categoryId,
-        paymentSourceId: formData.paymentSourceId,
-        paymentType: formData.paymentType,
-      };
+      const expenseData: Expense = createBaseExpense(
+        editId,
+        parseFloat(formData.amount),
+        formData.date,
+        formData.time,
+        formData.name,
+        formData.categoryId,
+        formData.paymentSourceId,
+        formData.paymentType
+      );
       
       // Add additional fields based on payment type
       if (formData.paymentType === "installments") {
@@ -149,9 +147,9 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
         
         // Generate additional expenses for installments and recurring payments
         if (formData.paymentType === "installments") {
-          generateInstallmentExpenses(expenseData);
+          generateInstallmentExpenses(expenseData, addExpense);
         } else if (formData.paymentType === "recurring") {
-          generateRecurringExpenses(expenseData);
+          generateRecurringExpenses(expenseData, addExpense);
         }
         
         toast({
@@ -174,252 +172,44 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
     }
   };
   
-  // Function to generate installment expenses
-  const generateInstallmentExpenses = (baseExpense: Expense) => {
-    const totalInstallments = baseExpense.totalInstallments || 1;
-    const installmentAmount = baseExpense.amount; // Amount per installment already calculated
-    
-    // Generate future installments (starting from the 2nd installment)
-    for (let i = 1; i < totalInstallments; i++) {
-      const installmentDate = addMonths(new Date(baseExpense.date), i);
-      
-      const installmentExpense: Expense = {
-        id: new Date().getTime().toString() + i, // Unique ID
-        amount: installmentAmount,
-        date: format(installmentDate, "yyyy-MM-dd"),
-        time: baseExpense.time,
-        name: `${baseExpense.name.split(' (')[0]} (${i + 1}/${totalInstallments})`, // Clean name and add installment number
-        categoryId: baseExpense.categoryId,
-        paymentSourceId: baseExpense.paymentSourceId,
-        paymentType: "installments",
-        installmentNumber: i + 1,
-        totalInstallments: totalInstallments,
-        isInstallment: true,
-        relatedExpenseId: baseExpense.id, // Link to original expense
-      };
-      
-      addExpense(installmentExpense);
-    }
-  };
-  
-  // Function to generate recurring expenses
-  const generateRecurringExpenses = (baseExpense: Expense) => {
-    // Default to 12 months if no end date is provided
-    const endDate = baseExpense.recurringEndDate 
-      ? new Date(baseExpense.recurringEndDate)
-      : addMonths(new Date(baseExpense.date), 12);
-    
-    const startDate = new Date(baseExpense.date);
-    let currentDate = addMonths(startDate, 1); // Start from next month
-    let counter = 1;
-    
-    // Generate recurring expenses until end date or max 12 months
-    while (currentDate <= endDate && counter <= 12) {
-      const recurringExpense: Expense = {
-        id: new Date().getTime().toString() + counter,
-        amount: baseExpense.amount,
-        date: format(currentDate, "yyyy-MM-dd"),
-        time: baseExpense.time,
-        name: `${baseExpense.name} (חודשי ${counter + 1})`,
-        categoryId: baseExpense.categoryId,
-        paymentSourceId: baseExpense.paymentSourceId,
-        paymentType: "recurring",
-        recurringEndDate: baseExpense.recurringEndDate,
-        isRecurring: true,
-        recurrenceType: "monthly",
-        relatedExpenseId: baseExpense.id,
-      };
-      
-      addExpense(recurringExpense);
-      
-      currentDate = addMonths(currentDate, 1);
-      counter++;
-    }
-  };
-  
   return (
     <form onSubmit={handleSubmit} className="space-y-6 bg-card p-6 rounded-lg shadow-sm">
       <h2 className="text-2xl font-bold mb-6">{editId ? "עריכת הוצאה" : "הוספת הוצאה חדשה"}</h2>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-2">
-          <Label htmlFor="name">שם ההוצאה</Label>
-          <Input
-            id="name"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            placeholder="שם ההוצאה"
-            required
-          />
-        </div>
+        <BasicExpenseFields
+          name={formData.name}
+          amount={formData.amount}
+          categoryId={formData.categoryId}
+          paymentSourceId={formData.paymentSourceId}
+          paymentType={formData.paymentType}
+          categories={categories}
+          paymentSources={paymentSources}
+          onInputChange={handleChange}
+          onSelectChange={handleSelectChange}
+        />
         
-        <div className="space-y-2">
-          <Label htmlFor="amount">סכום (₪)</Label>
-          <Input
-            id="amount"
-            name="amount"
-            type="number"
-            value={formData.amount}
-            onChange={handleChange}
-            placeholder="הזן סכום"
-            min="0"
-            step="0.01"
-            required
-          />
-        </div>
-        
-        <div className="space-y-2">
-          <Label>תאריך</Label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  "w-full justify-between text-right font-normal",
-                  !formData.date && "text-muted-foreground"
-                )}
-              >
-                {formData.date ? format(formData.date, "dd/MM/yyyy") : "בחר תאריך"}
-                <CalendarIcon className="h-4 w-4 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0 pointer-events-auto" align="start">
-              <Calendar
-                mode="single"
-                selected={formData.date}
-                onSelect={handleDateChange}
-                initialFocus
-                className="p-3 pointer-events-auto"
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="time">שעה</Label>
-          <Input
-            id="time"
-            name="time"
-            type="time"
-            value={formData.time}
-            onChange={handleChange}
-          />
-        </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="categoryId">קטגוריה</Label>
-          <Select
-            value={formData.categoryId}
-            onValueChange={(value) => handleSelectChange("categoryId", value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="בחר קטגוריה" />
-            </SelectTrigger>
-            <SelectContent>
-              {categories.map((category) => (
-                <SelectItem key={category.id} value={category.id}>
-                  {category.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="paymentSourceId">אמצעי תשלום</Label>
-          <Select
-            value={formData.paymentSourceId}
-            onValueChange={(value) => handleSelectChange("paymentSourceId", value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="בחר אמצעי תשלום" />
-            </SelectTrigger>
-            <SelectContent>
-              {paymentSources.map((source) => (
-                <SelectItem key={source.id} value={source.id}>
-                  {source.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="paymentType">סוג תשלום</Label>
-          <Select
-            value={formData.paymentType}
-            onValueChange={(value) => handleSelectChange("paymentType", value as PaymentType)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="בחר סוג תשלום" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="one-time">חד פעמי</SelectItem>
-              <SelectItem value="recurring">תשלום קבוע</SelectItem>
-              <SelectItem value="installments">תשלומים</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <DateTimeInputs
+          date={formData.date}
+          time={formData.time}
+          onDateChange={handleDateChange}
+          onTimeChange={handleChange}
+        />
         
         {formData.paymentType === "installments" && (
-          <>
-            <div className="space-y-2">
-              <Label htmlFor="installmentNumber">מספר תשלום</Label>
-              <Input
-                id="installmentNumber"
-                name="installmentNumber"
-                type="number"
-                min="1"
-                value={formData.installmentNumber}
-                onChange={handleChange}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="totalInstallments">סה"כ תשלומים</Label>
-              <Input
-                id="totalInstallments"
-                name="totalInstallments"
-                type="number"
-                min="1"
-                value={formData.totalInstallments}
-                onChange={handleChange}
-              />
-            </div>
-          </>
+          <InstallmentFields 
+            installmentNumber={formData.installmentNumber}
+            totalInstallments={formData.totalInstallments}
+            onChange={handleChange}
+          />
         )}
         
         {formData.paymentType === "recurring" && (
-          <div className="space-y-2">
-            <Label>תאריך סיום</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-between text-right font-normal",
-                    !formData.recurringEndDate && "text-muted-foreground"
-                  )}
-                >
-                  {formData.recurringEndDate 
-                    ? format(formData.recurringEndDate, "dd/MM/yyyy") 
-                    : "בחר תאריך סיום"}
-                  <CalendarIcon className="h-4 w-4 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 pointer-events-auto" align="start">
-                <Calendar
-                  mode="single"
-                  selected={formData.recurringEndDate}
-                  onSelect={handleRecurringEndDateChange}
-                  initialFocus
-                  disabled={(date) => date <= (formData.date || new Date())}
-                  className="p-3 pointer-events-auto"
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
+          <RecurringFields
+            recurringEndDate={formData.recurringEndDate}
+            startDate={formData.date}
+            onRecurringEndDateChange={handleRecurringEndDateChange}
+          />
         )}
       </div>
       
