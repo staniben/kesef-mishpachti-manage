@@ -5,6 +5,7 @@ import { DateTimeInputs } from "./expense/DateTimeInputs";
 import { FormActions } from "./expense/FormActions";
 import { PaymentTypeSelector } from "./expense/PaymentTypeSelector";
 import { InstallmentFields } from "./expense/InstallmentFields";
+import { RecurringFields } from "./expense/RecurringFields";
 import { useExpenseForm } from "@/hooks/useExpenseForm";
 
 interface ExpenseFormProps {
@@ -35,7 +36,7 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
       />
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {formData.paymentType !== "installment" && (
+        {formData.paymentType === "one-time" && (
           <BasicExpenseFields
             name={formData.name}
             amount={formData.amount}
@@ -48,7 +49,7 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
           />
         )}
         
-        {formData.paymentType !== "installment" && (
+        {formData.paymentType === "one-time" && (
           <DateTimeInputs
             date={formData.date}
             time={formData.time}
@@ -80,6 +81,28 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
             startDate={formData.startDate}
             onTotalAmountChange={handleChange}
             onNumberOfInstallmentsChange={handleChange}
+            onStartDateChange={handleStartDateChange}
+          />
+        </div>
+      )}
+      
+      {formData.paymentType === "recurring" && (
+        <div className="grid grid-cols-1 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <BasicExpenseFields
+              name={formData.name}
+              amount={formData.amount}
+              categoryId={formData.categoryId}
+              paymentSourceId={formData.paymentSourceId}
+              categories={categories}
+              paymentSources={paymentSources}
+              onInputChange={handleChange}
+              onSelectChange={handleSelectChange}
+            />
+          </div>
+          
+          <RecurringFields
+            startDate={formData.startDate}
             onStartDateChange={handleStartDateChange}
           />
         </div>

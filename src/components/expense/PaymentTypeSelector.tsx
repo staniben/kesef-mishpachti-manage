@@ -29,6 +29,10 @@ export function PaymentTypeSelector({
           <RadioGroupItem value="installment" id="installment" />
           <Label htmlFor="installment" className="cursor-pointer">תשלומים</Label>
         </div>
+        <div className="flex items-center space-x-2 space-x-reverse">
+          <RadioGroupItem value="recurring" id="recurring" />
+          <Label htmlFor="recurring" className="cursor-pointer">תשלום קבוע</Label>
+        </div>
       </RadioGroup>
     </div>
   );

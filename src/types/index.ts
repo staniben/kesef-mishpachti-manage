@@ -14,7 +14,9 @@ export type PaymentSource = {
   color?: string;
 };
 
-export type PaymentType = 'one-time' | 'installment';
+export type PaymentType = 'one-time' | 'installment' | 'recurring';
+
+export type RecurrenceType = 'monthly';
 
 export type Expense = {
   id: string;
@@ -31,4 +33,8 @@ export type Expense = {
   installmentNumber?: number;
   totalInstallments?: number;
   isInstallment?: boolean;
+  // For recurring payments
+  isRecurring?: boolean;
+  recurrenceId?: string;
+  recurrenceType?: RecurrenceType;
 };
