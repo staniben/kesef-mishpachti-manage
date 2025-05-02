@@ -106,7 +106,6 @@ export function BasicExpenseFields({
           <SelectContent>
             <SelectItem value="one-time">חד פעמי</SelectItem>
             <SelectItem value="recurring">תשלום קבוע</SelectItem>
-            <SelectItem value="installments">תשלומים</SelectItem>
           </SelectContent>
         </Select>
       </div>

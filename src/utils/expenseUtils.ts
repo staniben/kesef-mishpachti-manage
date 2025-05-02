@@ -28,44 +28,6 @@ export const createBaseExpense = (
 };
 
 /**
- * Generates installment expenses based on the base expense
- */
-export const generateInstallmentExpenses = (
-  baseExpense: Expense,
-  installmentNumber: number,
-  totalInstallments: number
-): Expense[] => {
-  const expenses: Expense[] = [];
-  const installmentAmount = baseExpense.amount / totalInstallments;
-  const baseDate = new Date(baseExpense.date);
-  const originalName = baseExpense.name.split(' (')[0]; // Clean name in case it has installment info
-  
-  // Generate all installments, starting from the first one
-  for (let i = 0; i < totalInstallments; i++) {
-    const installmentDate = i === 0 ? baseDate : addMonths(baseDate, i);
-    
-    const installmentExpense: Expense = {
-      id: new Date().getTime().toString() + `-${i}`, // Unique ID
-      amount: parseFloat(installmentAmount.toFixed(2)),
-      date: format(installmentDate, "yyyy-MM-dd"),
-      time: baseExpense.time,
-      name: `${originalName} (${i + 1}/${totalInstallments})`,
-      categoryId: baseExpense.categoryId,
-      paymentSourceId: baseExpense.paymentSourceId,
-      paymentType: "installments",
-      installmentNumber: i + 1,
-      totalInstallments: totalInstallments,
-      isInstallment: true,
-      relatedExpenseId: baseExpense.id, // Link to original expense
-    };
-    
-    expenses.push(installmentExpense);
-  }
-  
-  return expenses;
-};
-
-/**
  * Generates recurring expenses based on the base expense
  */
 export const generateRecurringExpenses = (

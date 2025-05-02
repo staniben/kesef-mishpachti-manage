@@ -8,9 +8,8 @@ import { Expense, PaymentType } from "@/types";
 import { format } from "date-fns";
 import { BasicExpenseFields } from "./expense/BasicExpenseFields";
 import { DateTimeInputs } from "./expense/DateTimeInputs";
-import { InstallmentFields } from "./expense/InstallmentFields";
 import { RecurringFields } from "./expense/RecurringFields";
-import { createBaseExpense, generateInstallmentExpenses, generateRecurringExpenses } from "@/utils/expenseUtils";
+import { createBaseExpense, generateRecurringExpenses } from "@/utils/expenseUtils";
 
 interface ExpenseFormProps {
   editId?: string;
@@ -30,8 +29,6 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
     categoryId: string;
     paymentSourceId: string;
     paymentType: PaymentType;
-    installmentNumber: string;
-    totalInstallments: string;
     recurringEndDate: Date | undefined;
   }>({
     id: "",
@@ -42,8 +39,6 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
     categoryId: categories.length > 0 ? categories[0].id : "",
     paymentSourceId: paymentSources.length > 0 ? paymentSources[0].id : "",
     paymentType: "one-time",
-    installmentNumber: "1",
-    totalInstallments: "3", // Default to 3 installments
     recurringEndDate: undefined,
   });
   
@@ -63,8 +58,6 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
           categoryId: expenseToEdit.categoryId,
           paymentSourceId: expenseToEdit.paymentSourceId,
           paymentType: expenseToEdit.paymentType,
-          installmentNumber: expenseToEdit.installmentNumber?.toString() || "1",
-          totalInstallments: expenseToEdit.totalInstallments?.toString() || "1",
           recurringEndDate: expenseToEdit.recurringEndDate 
             ? new Date(expenseToEdit.recurringEndDate) 
             : undefined,
@@ -131,25 +124,7 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
         });
       } else {
         // For new expenses, handle according to payment type
-        if (formData.paymentType === "installments") {
-          // Generate and save all installment expenses
-          const totalInstallments = parseInt(formData.totalInstallments || "1");
-          const installments = generateInstallmentExpenses(
-            baseExpense,
-            parseInt(formData.installmentNumber),
-            totalInstallments
-          );
-          
-          // Add all installment expenses to the database
-          installments.forEach(expense => {
-            addExpense(expense);
-          });
-          
-          toast({
-            title: "ההוצאות נוספו",
-            description: `נוספו ${totalInstallments} תשלומים בהצלחה`,
-          });
-        } else if (formData.paymentType === "recurring") {
+        if (formData.paymentType === "recurring") {
           // Generate and save all recurring expenses
           const recurringExpenses = generateRecurringExpenses(baseExpense);
           
@@ -209,14 +184,6 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
           onDateChange={handleDateChange}
           onTimeChange={handleChange}
         />
-        
-        {formData.paymentType === "installments" && (
-          <InstallmentFields 
-            installmentNumber={formData.installmentNumber}
-            totalInstallments={formData.totalInstallments}
-            onChange={handleChange}
-          />
-        )}
         
         {formData.paymentType === "recurring" && (
           <RecurringFields
