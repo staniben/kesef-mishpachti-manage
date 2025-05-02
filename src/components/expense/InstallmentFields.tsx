@@ -1,6 +1,7 @@
 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { FormItem, FormLabel, FormControl, FormDescription } from "@/components/ui/form";
 
 interface InstallmentFieldsProps {
   installmentNumber: string;
@@ -16,19 +17,7 @@ export function InstallmentFields({
   return (
     <>
       <div className="space-y-2">
-        <Label htmlFor="installmentNumber">מספר תשלום</Label>
-        <Input
-          id="installmentNumber"
-          name="installmentNumber"
-          type="number"
-          min="1"
-          value={installmentNumber}
-          onChange={onChange}
-        />
-      </div>
-      
-      <div className="space-y-2">
-        <Label htmlFor="totalInstallments">סה"כ תשלומים</Label>
+        <Label htmlFor="totalInstallments">מספר תשלומים</Label>
         <Input
           id="totalInstallments"
           name="totalInstallments"
@@ -37,6 +26,9 @@ export function InstallmentFields({
           value={totalInstallments}
           onChange={onChange}
         />
+        <p className="text-sm text-muted-foreground">
+          סכום ההוצאה יחולק באופן שווה בין כל התשלומים
+        </p>
       </div>
     </>
   );

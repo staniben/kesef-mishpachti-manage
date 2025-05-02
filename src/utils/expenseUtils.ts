@@ -32,21 +32,24 @@ export const createBaseExpense = (
  */
 export const generateInstallmentExpenses = (
   baseExpense: Expense,
-  addExpense: (expense: Expense) => void
-): void => {
-  const totalInstallments = baseExpense.totalInstallments || 1;
-  const installmentAmount = baseExpense.amount; // Amount per installment already calculated
+  installmentNumber: number,
+  totalInstallments: number
+): Expense[] => {
+  const expenses: Expense[] = [];
+  const installmentAmount = baseExpense.amount / totalInstallments;
+  const baseDate = new Date(baseExpense.date);
+  const originalName = baseExpense.name.split(' (')[0]; // Clean name in case it has installment info
   
-  // Generate future installments (starting from the 2nd installment)
-  for (let i = 1; i < totalInstallments; i++) {
-    const installmentDate = addMonths(new Date(baseExpense.date), i);
+  // Generate all installments, starting from the first one
+  for (let i = 0; i < totalInstallments; i++) {
+    const installmentDate = i === 0 ? baseDate : addMonths(baseDate, i);
     
     const installmentExpense: Expense = {
-      id: new Date().getTime().toString() + i, // Unique ID
-      amount: installmentAmount,
+      id: new Date().getTime().toString() + `-${i}`, // Unique ID
+      amount: parseFloat(installmentAmount.toFixed(2)),
       date: format(installmentDate, "yyyy-MM-dd"),
       time: baseExpense.time,
-      name: `${baseExpense.name.split(' (')[0]} (${i + 1}/${totalInstallments})`, // Clean name and add installment number
+      name: `${originalName} (${i + 1}/${totalInstallments})`,
       categoryId: baseExpense.categoryId,
       paymentSourceId: baseExpense.paymentSourceId,
       paymentType: "installments",
@@ -56,8 +59,10 @@ export const generateInstallmentExpenses = (
       relatedExpenseId: baseExpense.id, // Link to original expense
     };
     
-    addExpense(installmentExpense);
+    expenses.push(installmentExpense);
   }
+  
+  return expenses;
 };
 
 /**
@@ -65,37 +70,32 @@ export const generateInstallmentExpenses = (
  */
 export const generateRecurringExpenses = (
   baseExpense: Expense,
-  addExpense: (expense: Expense) => void
-): void => {
-  // Default to 12 months if no end date is provided
-  const endDate = baseExpense.recurringEndDate 
-    ? new Date(baseExpense.recurringEndDate)
-    : addMonths(new Date(baseExpense.date), 12);
+): Expense[] => {
+  const expenses: Expense[] = [];
+  const baseDate = new Date(baseExpense.date);
+  const originalName = baseExpense.name;
   
-  const startDate = new Date(baseExpense.date);
-  let currentDate = addMonths(startDate, 1); // Start from next month
-  let counter = 1;
-  
-  // Generate recurring expenses until end date or max 12 months
-  while (currentDate <= endDate && counter <= 12) {
+  // Generate 12 recurring expenses, including original month
+  for (let i = 0; i < 12; i++) {
+    const recurringDate = i === 0 ? baseDate : addMonths(baseDate, i);
+    
     const recurringExpense: Expense = {
-      id: new Date().getTime().toString() + counter,
+      id: new Date().getTime().toString() + `-rec-${i}`,
       amount: baseExpense.amount,
-      date: format(currentDate, "yyyy-MM-dd"),
+      date: format(recurringDate, "yyyy-MM-dd"),
       time: baseExpense.time,
-      name: `${baseExpense.name} (חודשי ${counter + 1})`,
+      name: i === 0 ? originalName : `${originalName} (חודשי ${i + 1})`,
       categoryId: baseExpense.categoryId,
       paymentSourceId: baseExpense.paymentSourceId,
       paymentType: "recurring",
       recurringEndDate: baseExpense.recurringEndDate,
       isRecurring: true,
       recurrenceType: "monthly",
-      relatedExpenseId: baseExpense.id,
+      relatedExpenseId: i === 0 ? undefined : baseExpense.id,
     };
     
-    addExpense(recurringExpense);
-    
-    currentDate = addMonths(currentDate, 1);
-    counter++;
+    expenses.push(recurringExpense);
   }
+  
+  return expenses;
 };

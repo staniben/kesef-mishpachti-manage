@@ -43,7 +43,7 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
     paymentSourceId: paymentSources.length > 0 ? paymentSources[0].id : "",
     paymentType: "one-time",
     installmentNumber: "1",
-    totalInstallments: "1",
+    totalInstallments: "3", // Default to 3 installments
     recurringEndDate: undefined,
   });
   
@@ -105,10 +105,15 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
     setIsSubmitting(true);
     
     try {
-      // For installments, this is the first payment
-      const expenseData: Expense = createBaseExpense(
+      const totalAmount = parseFloat(formData.amount);
+      if (isNaN(totalAmount) || totalAmount <= 0) {
+        throw new Error("יש להזין סכום חיובי");
+      }
+      
+      // Create the base expense object
+      const baseExpense: Expense = createBaseExpense(
         editId,
-        parseFloat(formData.amount),
+        totalAmount,
         formData.date,
         formData.time,
         formData.name,
@@ -117,54 +122,63 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
         formData.paymentType
       );
       
-      // Add additional fields based on payment type
-      if (formData.paymentType === "installments") {
-        const totalInstallments = parseInt(formData.totalInstallments || "1");
-        const installmentAmount = parseFloat((parseFloat(formData.amount) / totalInstallments).toFixed(2));
-        
-        // Update the first payment amount and add installment details
-        expenseData.amount = installmentAmount;
-        expenseData.installmentNumber = 1;
-        expenseData.totalInstallments = totalInstallments;
-        expenseData.isInstallment = true;
-        expenseData.name = `${formData.name} (1/${totalInstallments})`;
-      } else if (formData.paymentType === "recurring" && formData.recurringEndDate) {
-        expenseData.recurringEndDate = format(formData.recurringEndDate, "yyyy-MM-dd");
-        expenseData.isRecurring = true;
-        expenseData.recurrenceType = "monthly";
-      }
-      
       if (editId) {
         // When editing, just update the single expense
-        updateExpense(editId, expenseData);
+        updateExpense(editId, baseExpense);
         toast({
           title: "ההוצאה עודכנה",
           description: "פרטי ההוצאה עודכנו בהצלחה",
         });
       } else {
         // For new expenses, handle according to payment type
-        addExpense(expenseData);
-        
-        // Generate additional expenses for installments and recurring payments
         if (formData.paymentType === "installments") {
-          generateInstallmentExpenses(expenseData, addExpense);
+          // Generate and save all installment expenses
+          const totalInstallments = parseInt(formData.totalInstallments || "1");
+          const installments = generateInstallmentExpenses(
+            baseExpense,
+            parseInt(formData.installmentNumber),
+            totalInstallments
+          );
+          
+          // Add all installment expenses to the database
+          installments.forEach(expense => {
+            addExpense(expense);
+          });
+          
+          toast({
+            title: "ההוצאות נוספו",
+            description: `נוספו ${totalInstallments} תשלומים בהצלחה`,
+          });
         } else if (formData.paymentType === "recurring") {
-          generateRecurringExpenses(expenseData, addExpense);
+          // Generate and save all recurring expenses
+          const recurringExpenses = generateRecurringExpenses(baseExpense);
+          
+          // Add all recurring expenses to the database
+          recurringExpenses.forEach(expense => {
+            addExpense(expense);
+          });
+          
+          toast({
+            title: "ההוצאות החוזרות נוספו",
+            description: "נוספו 12 הוצאות חודשיות בהצלחה",
+          });
+        } else {
+          // One-time expense - just add it as is
+          addExpense(baseExpense);
+          
+          toast({
+            title: "ההוצאה נוספה",
+            description: "ההוצאה נוספה בהצלחה",
+          });
         }
-        
-        toast({
-          title: "ההוצאה נוספה",
-          description: formData.paymentType !== "one-time" 
-            ? "ההוצאה והתשלומים העתידיים נוספו בהצלחה" 
-            : "ההוצאה נוספה בהצלחה",
-        });
       }
       
+      // Navigate back to the dashboard after adding/editing
       navigate("/");
     } catch (error) {
       toast({
         title: "שגיאה",
-        description: "אירעה שגיאה בעת שמירת ההוצאה",
+        description: error instanceof Error ? error.message : "אירעה שגיאה בעת שמירת ההוצאה",
         variant: "destructive",
       });
     } finally {
