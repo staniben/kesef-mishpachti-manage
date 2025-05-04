@@ -41,6 +41,13 @@ const createExpenseTestRecord = (userId: string): Omit<DbExpense, 'id'> => {
     date: now,
     payment_type: 'one-time',
     user_id: userId,
+    category_id: null,
+    payment_source_id: null,
+    recurring: false,
+    recurring_interval: null,
+    recurring_end_date: null,
+    installment: false,
+    installment_count: null,
     created_at: now,
     updated_at: now
   };
