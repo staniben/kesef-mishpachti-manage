@@ -65,3 +65,21 @@ export interface OperationResult<T = void> {
   error?: Error | unknown;
   isLoading: boolean;
 }
+
+/**
+ * Type for Supabase response handling
+ */
+export interface SupabaseResponse<T> {
+  data: T | null;
+  error: Error | null;
+}
+
+/**
+ * Type for service operation response
+ */
+export interface ServiceResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: Error | unknown;
+  message?: string;
+}

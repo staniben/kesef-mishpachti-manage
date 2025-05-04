@@ -2,6 +2,12 @@
 import { useToast } from "@/hooks/use-toast";
 import { PostgrestError } from "@supabase/supabase-js";
 
+interface ToastConfig {
+  title: string;
+  description: string;
+  variant?: "default" | "destructive";
+}
+
 /**
  * Extracts a user-friendly error message from various error types
  */
@@ -30,12 +36,32 @@ export const extractErrorMessage = (error: unknown): string => {
 };
 
 /**
+ * Maps Supabase error codes to user-friendly messages
+ */
+export const getErrorMessageForCode = (code: string | undefined, operation: string): string => {
+  if (!code) return `שגיאה ב${operation}`;
+  
+  switch (code) {
+    case '42501': 
+      return `הרשאות: אין לך הרשאות מתאימות ל${operation}`;
+    case '23503': 
+      return `שגיאת התייחסות: לא ניתן להשלים את ה${operation}`;
+    case '23505': 
+      return `ערך כבר קיים: לא ניתן להשלים את ה${operation}`;
+    case '23502': 
+      return `שדה חובה חסר: לא ניתן להשלים את ה${operation}`;
+    default:
+      return `שגיאה ב${operation}: קוד ${code}`;
+  }
+};
+
+/**
  * Handles Supabase errors with consistent logging and user feedback
  */
 export const handleSupabaseError = (
   error: PostgrestError | null | unknown,
   operation: string,
-  toastFn?: ReturnType<typeof useToast>["toast"]
+  toastFn?: (config: ToastConfig) => void
 ): void => {
   if (!error) return;
   
@@ -52,18 +78,8 @@ export const handleSupabaseError = (
       console.error('Error code:', pgError.code);
       console.error('Error message:', pgError.message);
       console.error('Error details:', pgError.details);
-    }
-    
-    // Handle specific PostgreSQL error codes
-    if (pgError.code === '42501') {
-      userMessage = `הרשאות: אין לך הרשאות מתאימות ל${operation}`;
-      console.error('🔒 RLS ERROR: Permissions error. Check RLS policies.');
-    } else if (pgError.code === '23503') {
-      userMessage = `שגיאת התייחסות: לא ניתן להשלים את ה${operation}`;
-      console.error('🔑 FOREIGN KEY ERROR: Foreign key constraint violation.');
-    } else if (pgError.code === '23505') {
-      userMessage = `ערך כבר קיים: לא ניתן להשלים את ה${operation}`;
-      console.error('🔢 UNIQUE VIOLATION: Unique constraint violated.');
+      
+      userMessage = getErrorMessageForCode(pgError.code, operation);
     } else {
       userMessage = `שגיאה ב${operation}: ${extractErrorMessage(error)}`;
     }
@@ -118,6 +134,10 @@ export const validateExpenseData = (
   
   if (!isValidField(data.paymentSourceId || data.payment_source_id)) {
     return { isValid: false, errorMessage: "אמצעי תשלום הוא שדה חובה" };
+  }
+  
+  if (!isValidField(data.user_id)) {
+    return { isValid: false, errorMessage: "מזהה משתמש הוא שדה חובה" };
   }
   
   // All validations passed

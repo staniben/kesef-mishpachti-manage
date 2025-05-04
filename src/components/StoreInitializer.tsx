@@ -123,7 +123,7 @@ export function StoreInitializer() {
           errorMessage += " (ניסיון " + (initializationAttempts + 1) + ")";
         }
         
-        // Fix the type error - toast expects an object with specific properties
+        // Fix the toast() call by using an object with required properties
         toast({
           title: "שגיאה בטעינת נתונים",
           description: errorMessage,

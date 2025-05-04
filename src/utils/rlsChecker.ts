@@ -1,26 +1,69 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { DbCategory, DbExpense, DbPaymentSource, TableName } from "@/types/supabase";
+import { v4 as uuidv4 } from 'uuid';
 
 // RLS policy types that can be tested
 type RlsOperation = 'select' | 'insert' | 'update' | 'delete';
-type RlsTable = 'categories' | 'expenses' | 'payment_sources';
 
 interface RlsTestResult {
   operation: RlsOperation;
-  table: RlsTable;
+  table: TableName;
   success: boolean;
   error?: any;
   message: string;
 }
 
 /**
+ * Creates a valid test record for a specific table
+ */
+const createTestRecord = (table: TableName, userId: string): Partial<DbCategory | DbExpense | DbPaymentSource> => {
+  const testId = uuidv4();
+  const now = new Date().toISOString();
+  
+  // Base properties for all tables
+  const baseRecord = {
+    id: testId,
+    user_id: userId,
+    created_at: now,
+    updated_at: now,
+  };
+  
+  // Add table-specific required properties
+  switch(table) {
+    case 'categories':
+      return {
+        ...baseRecord,
+        name: `Test Category ${testId.substring(0, 8)}`,
+        color: '#ff0000',
+      } as Partial<DbCategory>;
+      
+    case 'expenses':
+      return {
+        ...baseRecord,
+        title: `Test Expense ${testId.substring(0, 8)}`,
+        amount: 100,
+        date: now,
+        payment_type: 'one-time',
+      } as Partial<DbExpense>;
+      
+    case 'payment_sources':
+      return {
+        ...baseRecord,
+        name: `Test Source ${testId.substring(0, 8)}`,
+        type: 'cash', 
+        color: '#00ff00',
+      } as Partial<DbPaymentSource>;
+  }
+}
+
+/**
  * Tests RLS policies for a specific table and operation
  */
 export const testRlsPolicy = async (
-  table: RlsTable,
-  operation: RlsOperation,
-  testData?: Record<string, any>
+  table: TableName,
+  operation: RlsOperation
 ): Promise<RlsTestResult> => {
   try {
     const { data: userData } = await supabase.auth.getUser();
@@ -34,14 +77,8 @@ export const testRlsPolicy = async (
       };
     }
     
-    // Default test data if not provided
-    const defaultTestData = {
-      id: crypto.randomUUID(),
-      name: `RLS Test ${Date.now()}`,
-      user_id: userData.user.id,
-    };
-    
-    const data = testData || defaultTestData;
+    // Create a valid test record for the table
+    const testData = createTestRecord(table, userData.user.id);
     let result: any;
     
     switch (operation) {
@@ -56,7 +93,7 @@ export const testRlsPolicy = async (
         // Only perform a dry run - immediately delete after insert
         result = await supabase
           .from(table)
-          .insert({ ...data, user_id: userData.user.id })
+          .insert(testData)
           .select()
           .single();
           
@@ -65,7 +102,7 @@ export const testRlsPolicy = async (
           await supabase
             .from(table)
             .delete()
-            .eq('id', result.data.id);
+            .eq('id', testData.id);
         }
         break;
         
@@ -73,7 +110,7 @@ export const testRlsPolicy = async (
         // First insert a test row
         const insertResult = await supabase
           .from(table)
-          .insert({ ...data, user_id: userData.user.id })
+          .insert(testData)
           .select()
           .single();
           
@@ -107,7 +144,7 @@ export const testRlsPolicy = async (
         // First insert a test row
         const insertForDelete = await supabase
           .from(table)
-          .insert({ ...data, user_id: userData.user.id })
+          .insert(testData)
           .select()
           .single();
           
@@ -168,7 +205,7 @@ export const useRlsChecker = () => {
   /**
    * Tests all RLS policies (select, insert, update, delete) for a table
    */
-  const testAllPolicies = async (table: RlsTable): Promise<RlsTestResult[]> => {
+  const testAllPolicies = async (table: TableName): Promise<RlsTestResult[]> => {
     const operations: RlsOperation[] = ['select', 'insert', 'update', 'delete'];
     const results: RlsTestResult[] = [];
     
