@@ -8,7 +8,7 @@ const mapDbSourceToModel = (dbSource: any): PaymentSource => ({
   id: dbSource.id,
   name: dbSource.name,
   type: dbSource.type,
-  color: dbSource.color,
+  color: dbSource.color || "#2196F3", // Default color if not provided
   createdAt: dbSource.created_at,
   updatedAt: dbSource.updated_at
 });
@@ -83,6 +83,8 @@ export const paymentSourceService = {
     
     // Set the user_id from authenticated session
     dbSource.user_id = userData.user.id;
+    
+    console.log('Creating payment source with data:', dbSource);
     
     const { data, error } = await supabase
       .from('payment_sources')
