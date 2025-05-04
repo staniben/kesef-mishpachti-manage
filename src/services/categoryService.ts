@@ -1,74 +1,101 @@
 
 import { ExpenseCategory } from '@/types/models';
-import { storage } from './localStorage';
-import { initialCategories, generateId } from './mockData';
-import { expenseService } from './expenseService';
-
-const STORAGE_KEY = 'categories';
-
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+import { supabase } from '@/integrations/supabase/client';
+import { generateId } from './mockData';
 
 export const categoryService = {
   getAll: async (): Promise<ExpenseCategory[]> => {
-    await delay(300);
-    return storage.get<ExpenseCategory[]>(STORAGE_KEY, initialCategories);
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*');
+
+    if (error) {
+      console.error('Error fetching categories:', error);
+      throw error;
+    }
+
+    return data || [];
   },
 
   getById: async (id: string): Promise<ExpenseCategory | null> => {
-    await delay(200);
-    const categories = storage.get<ExpenseCategory[]>(STORAGE_KEY, initialCategories);
-    return categories.find(category => category.id === id) || null;
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      console.error(`Error fetching category with ID ${id}:`, error);
+      throw error;
+    }
+
+    return data;
   },
 
   create: async (category: ExpenseCategory): Promise<ExpenseCategory> => {
-    await delay(400);
-    const categories = storage.get<ExpenseCategory[]>(STORAGE_KEY, initialCategories);
+    const user = supabase.auth.getUser();
     
-    const newCategory: ExpenseCategory = {
+    const newCategory = {
       ...category,
       id: category.id || generateId(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      user_id: (await user).data.user?.id,
     };
     
-    storage.set(STORAGE_KEY, [...categories, newCategory]);
-    return newCategory;
+    const { data, error } = await supabase
+      .from('categories')
+      .insert(newCategory)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating category:', error);
+      throw error;
+    }
+
+    return data;
   },
 
   update: async (id: string, categoryData: Partial<ExpenseCategory>): Promise<ExpenseCategory> => {
-    await delay(400);
-    const categories = storage.get<ExpenseCategory[]>(STORAGE_KEY, initialCategories);
-    const index = categories.findIndex(category => category.id === id);
-    
-    if (index === -1) {
-      throw new Error(`Category with ID ${id} not found`);
+    const { data, error } = await supabase
+      .from('categories')
+      .update(categoryData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error(`Error updating category with ID ${id}:`, error);
+      throw error;
     }
-    
-    const updatedCategory: ExpenseCategory = {
-      ...categories[index],
-      ...categoryData,
-      updatedAt: new Date().toISOString()
-    };
-    
-    categories[index] = updatedCategory;
-    storage.set(STORAGE_KEY, categories);
-    
-    return updatedCategory;
+
+    return data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await delay(400);
-    const categories = storage.get<ExpenseCategory[]>(STORAGE_KEY, initialCategories);
+    // First check how many categories the user has
+    const { count, error: countError } = await supabase
+      .from('categories')
+      .select('*', { count: 'exact', head: true });
+    
+    if (countError) {
+      console.error('Error counting categories:', countError);
+      throw countError;
+    }
     
     // Check if this is the last category
-    if (categories.length <= 1) {
+    if (count !== null && count <= 1) {
       throw new Error('Cannot delete the last category');
     }
     
-    const filteredCategories = categories.filter(category => category.id !== id);
-    storage.set(STORAGE_KEY, filteredCategories);
-    
-    // Delete or reassign related expenses
-    await expenseService.deleteByCategory(id);
+    // Delete the category
+    const { error } = await supabase
+      .from('categories')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error(`Error deleting category with ID ${id}:`, error);
+      throw error;
+    }
   }
 };

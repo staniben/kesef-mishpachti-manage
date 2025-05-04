@@ -2,6 +2,7 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { Outlet } from "react-router-dom";
+import { UserProfile } from "../UserProfile";
 
 export function Layout() {
   return (
@@ -12,7 +13,10 @@ export function Layout() {
           <div className="container mx-auto">
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-2xl font-bold">ניהול תקציב משפחתי</h1>
-              <SidebarTrigger />
+              <div className="flex items-center gap-4">
+                <UserProfile />
+                <SidebarTrigger />
+              </div>
             </div>
             <Outlet />
           </div>

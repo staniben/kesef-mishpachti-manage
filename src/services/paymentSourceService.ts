@@ -1,74 +1,101 @@
 
 import { PaymentSource } from '@/types/models';
-import { storage } from './localStorage';
-import { initialPaymentSources, generateId } from './mockData';
-import { expenseService } from './expenseService';
-
-const STORAGE_KEY = 'paymentSources';
-
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+import { supabase } from '@/integrations/supabase/client';
+import { generateId } from './mockData';
 
 export const paymentSourceService = {
   getAll: async (): Promise<PaymentSource[]> => {
-    await delay(300);
-    return storage.get<PaymentSource[]>(STORAGE_KEY, initialPaymentSources);
+    const { data, error } = await supabase
+      .from('payment_sources')
+      .select('*');
+
+    if (error) {
+      console.error('Error fetching payment sources:', error);
+      throw error;
+    }
+
+    return data || [];
   },
 
   getById: async (id: string): Promise<PaymentSource | null> => {
-    await delay(200);
-    const sources = storage.get<PaymentSource[]>(STORAGE_KEY, initialPaymentSources);
-    return sources.find(source => source.id === id) || null;
+    const { data, error } = await supabase
+      .from('payment_sources')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      console.error(`Error fetching payment source with ID ${id}:`, error);
+      throw error;
+    }
+
+    return data;
   },
 
   create: async (source: PaymentSource): Promise<PaymentSource> => {
-    await delay(400);
-    const sources = storage.get<PaymentSource[]>(STORAGE_KEY, initialPaymentSources);
+    const user = supabase.auth.getUser();
     
-    const newSource: PaymentSource = {
+    const newSource = {
       ...source,
       id: source.id || generateId(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      user_id: (await user).data.user?.id,
     };
     
-    storage.set(STORAGE_KEY, [...sources, newSource]);
-    return newSource;
+    const { data, error } = await supabase
+      .from('payment_sources')
+      .insert(newSource)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating payment source:', error);
+      throw error;
+    }
+
+    return data;
   },
 
   update: async (id: string, sourceData: Partial<PaymentSource>): Promise<PaymentSource> => {
-    await delay(400);
-    const sources = storage.get<PaymentSource[]>(STORAGE_KEY, initialPaymentSources);
-    const index = sources.findIndex(source => source.id === id);
-    
-    if (index === -1) {
-      throw new Error(`Payment source with ID ${id} not found`);
+    const { data, error } = await supabase
+      .from('payment_sources')
+      .update(sourceData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error(`Error updating payment source with ID ${id}:`, error);
+      throw error;
     }
-    
-    const updatedSource: PaymentSource = {
-      ...sources[index],
-      ...sourceData,
-      updatedAt: new Date().toISOString()
-    };
-    
-    sources[index] = updatedSource;
-    storage.set(STORAGE_KEY, sources);
-    
-    return updatedSource;
+
+    return data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await delay(400);
-    const sources = storage.get<PaymentSource[]>(STORAGE_KEY, initialPaymentSources);
+    // First check how many payment sources the user has
+    const { count, error: countError } = await supabase
+      .from('payment_sources')
+      .select('*', { count: 'exact', head: true });
+    
+    if (countError) {
+      console.error('Error counting payment sources:', countError);
+      throw countError;
+    }
     
     // Check if this is the last payment source
-    if (sources.length <= 1) {
+    if (count !== null && count <= 1) {
       throw new Error('Cannot delete the last payment source');
     }
     
-    const filteredSources = sources.filter(source => source.id !== id);
-    storage.set(STORAGE_KEY, filteredSources);
-    
-    // Delete or reassign related expenses
-    await expenseService.deleteByPaymentSource(id);
+    // Delete the payment source
+    const { error } = await supabase
+      .from('payment_sources')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error(`Error deleting payment source with ID ${id}:`, error);
+      throw error;
+    }
   }
 };

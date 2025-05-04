@@ -1,135 +1,180 @@
 
 import { Expense } from '@/types/models';
-import { storage } from './localStorage';
-import { initialExpenses, generateId } from './mockData';
-
-const STORAGE_KEY = 'expenses';
-
-// Simulate API delay for realistic behavior
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+import { supabase } from '@/integrations/supabase/client';
+import { generateId } from './mockData';
 
 export const expenseService = {
   getAll: async (): Promise<Expense[]> => {
-    await delay(300);
-    const expenses = storage.get<Expense[]>(STORAGE_KEY, initialExpenses);
-    return expenses;
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*');
+
+    if (error) {
+      console.error('Error fetching expenses:', error);
+      throw error;
+    }
+
+    return data || [];
   },
 
   getById: async (id: string): Promise<Expense | null> => {
-    await delay(200);
-    const expenses = storage.get<Expense[]>(STORAGE_KEY, initialExpenses);
-    return expenses.find(expense => expense.id === id) || null;
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      console.error(`Error fetching expense with ID ${id}:`, error);
+      throw error;
+    }
+
+    return data;
   },
 
   getByMonth: async (month: number, year: number): Promise<Expense[]> => {
-    await delay(300);
-    const expenses = storage.get<Expense[]>(STORAGE_KEY, initialExpenses);
-    return expenses.filter(expense => {
-      const date = new Date(expense.date);
-      return date.getMonth() === month && date.getFullYear() === year;
-    });
+    // Convert month/year to start and end dates for querying
+    const startDate = new Date(year, month, 1);
+    const endDate = new Date(year, month + 1, 0);
+    
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .gte('date', startDate.toISOString())
+      .lt('date', endDate.toISOString());
+
+    if (error) {
+      console.error('Error fetching expenses by month:', error);
+      throw error;
+    }
+
+    return data || [];
   },
   
   getByCategory: async (categoryId: string): Promise<Expense[]> => {
-    await delay(300);
-    const expenses = storage.get<Expense[]>(STORAGE_KEY, initialExpenses);
-    return expenses.filter(expense => expense.categoryId === categoryId);
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .eq('category_id', categoryId);
+
+    if (error) {
+      console.error(`Error fetching expenses for category ${categoryId}:`, error);
+      throw error;
+    }
+
+    return data || [];
   },
   
   getByPaymentSource: async (sourceId: string): Promise<Expense[]> => {
-    await delay(300);
-    const expenses = storage.get<Expense[]>(STORAGE_KEY, initialExpenses);
-    return expenses.filter(expense => expense.paymentSourceId === sourceId);
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .eq('payment_source_id', sourceId);
+
+    if (error) {
+      console.error(`Error fetching expenses for payment source ${sourceId}:`, error);
+      throw error;
+    }
+
+    return data || [];
   },
 
   create: async (expense: Expense): Promise<Expense> => {
-    await delay(400);
-    const expenses = storage.get<Expense[]>(STORAGE_KEY, initialExpenses);
+    const user = supabase.auth.getUser();
     
-    const newExpense: Expense = {
+    const newExpense = {
       ...expense,
       id: expense.id || generateId(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      user_id: (await user).data.user?.id,
     };
     
-    storage.set(STORAGE_KEY, [...expenses, newExpense]);
-    return newExpense;
+    const { data, error } = await supabase
+      .from('expenses')
+      .insert(newExpense)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating expense:', error);
+      throw error;
+    }
+
+    return data;
   },
   
   createBatch: async (newExpenses: Expense[]): Promise<Expense[]> => {
-    await delay(500);
-    const expenses = storage.get<Expense[]>(STORAGE_KEY, initialExpenses);
+    const user = supabase.auth.getUser();
     
-    const expensesWithMetadata = newExpenses.map(expense => ({
-      ...expense,
-      id: expense.id || generateId(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    }));
+    const expensesWithMetadata = await Promise.all(
+      newExpenses.map(async (expense) => ({
+        ...expense,
+        id: expense.id || generateId(),
+        user_id: (await user).data.user?.id,
+      }))
+    );
     
-    storage.set(STORAGE_KEY, [...expenses, ...expensesWithMetadata]);
-    return expensesWithMetadata;
+    const { data, error } = await supabase
+      .from('expenses')
+      .insert(expensesWithMetadata)
+      .select();
+
+    if (error) {
+      console.error('Error creating batch expenses:', error);
+      throw error;
+    }
+
+    return data || [];
   },
 
   update: async (id: string, expenseData: Partial<Expense>): Promise<Expense> => {
-    await delay(400);
-    const expenses = storage.get<Expense[]>(STORAGE_KEY, initialExpenses);
-    const index = expenses.findIndex(expense => expense.id === id);
-    
-    if (index === -1) {
-      throw new Error(`Expense with ID ${id} not found`);
+    const { data, error } = await supabase
+      .from('expenses')
+      .update(expenseData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error(`Error updating expense with ID ${id}:`, error);
+      throw error;
     }
-    
-    const updatedExpense: Expense = {
-      ...expenses[index],
-      ...expenseData,
-      updatedAt: new Date().toISOString()
-    };
-    
-    expenses[index] = updatedExpense;
-    storage.set(STORAGE_KEY, expenses);
-    
-    return updatedExpense;
+
+    return data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await delay(400);
-    const expenses = storage.get<Expense[]>(STORAGE_KEY, initialExpenses);
-    const filteredExpenses = expenses.filter(expense => expense.id !== id);
-    
-    // Also delete any related expenses (installments, recurring)
-    const relatedExpenses = expenses.filter(
-      expense => expense.relatedExpenseId === id ||
-                (expense.recurrenceId && 
-                 expenses.find(e => e.id === id)?.recurrenceId === expense.recurrenceId)
-    );
-    
-    if (relatedExpenses.length > 0) {
-      relatedExpenses.forEach(expense => {
-        const index = filteredExpenses.findIndex(e => e.id === expense.id);
-        if (index !== -1) {
-          filteredExpenses.splice(index, 1);
-        }
-      });
+    const { error } = await supabase
+      .from('expenses')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error(`Error deleting expense with ID ${id}:`, error);
+      throw error;
     }
-    
-    storage.set(STORAGE_KEY, filteredExpenses);
   },
   
-  // Delete all expenses for a specific category
   deleteByCategory: async (categoryId: string): Promise<void> => {
-    await delay(400);
-    const expenses = storage.get<Expense[]>(STORAGE_KEY, initialExpenses);
-    const filteredExpenses = expenses.filter(expense => expense.categoryId !== categoryId);
-    storage.set(STORAGE_KEY, filteredExpenses);
+    const { error } = await supabase
+      .from('expenses')
+      .delete()
+      .eq('category_id', categoryId);
+
+    if (error) {
+      console.error(`Error deleting expenses for category ${categoryId}:`, error);
+      throw error;
+    }
   },
   
-  // Delete all expenses for a specific payment source
   deleteByPaymentSource: async (sourceId: string): Promise<void> => {
-    await delay(400);
-    const expenses = storage.get<Expense[]>(STORAGE_KEY, initialExpenses);
-    const filteredExpenses = expenses.filter(expense => expense.paymentSourceId !== sourceId);
-    storage.set(STORAGE_KEY, filteredExpenses);
+    const { error } = await supabase
+      .from('expenses')
+      .delete()
+      .eq('payment_source_id', sourceId);
+
+    if (error) {
+      console.error(`Error deleting expenses for payment source ${sourceId}:`, error);
+      throw error;
+    }
   }
 };
