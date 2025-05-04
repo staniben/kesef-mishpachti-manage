@@ -13,7 +13,7 @@ import {
   SidebarTrigger,
   useSidebar
 } from "@/components/ui/sidebar";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { ChartPie, CreditCard, Plus, Settings, X } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 import { useRef, useEffect } from "react";
@@ -22,6 +22,18 @@ export function AppSidebar() {
   const { expenses, categories, paymentSources } = useAppContext();
   const { openMobile, setOpenMobile, isMobile, open, setOpen } = useSidebar();
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const location = useLocation();
+
+  // Close sidebar when route changes
+  useEffect(() => {
+    if (isMobile && openMobile) {
+      setOpenMobile(false);
+    }
+    // For desktop, only close when in offcanvas mode
+    else if (!isMobile && open) {
+      setOpen(false);
+    }
+  }, [location, isMobile, openMobile, setOpenMobile, open, setOpen]);
 
   // Handle clicks outside the sidebar to close it
   useEffect(() => {
