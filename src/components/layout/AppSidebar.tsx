@@ -88,6 +88,15 @@ export function AppSidebar() {
     },
   ];
 
+  // Function to handle menu item clicks
+  const handleMenuItemClick = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    } else {
+      setOpen(false);
+    }
+  };
+
   return (
     <Sidebar variant="floating" collapsible="offcanvas" ref={sidebarRef}>
       <SidebarHeader className="p-4 flex justify-between items-center">
@@ -103,7 +112,11 @@ export function AppSidebar() {
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <Link to={item.url} className="flex items-center gap-2">
+                    <Link 
+                      to={item.url} 
+                      className="flex items-center gap-2"
+                      onClick={handleMenuItemClick}
+                    >
                       <item.icon className="h-5 w-5" />
                       <span>{item.title}</span>
                     </Link>
