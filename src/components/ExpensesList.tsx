@@ -1,10 +1,10 @@
 
-import { useAppContext } from "@/context/AppContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Edit, Trash } from "lucide-react";
-import { ExpenseCategory, PaymentSource } from "@/types";
+import { useAppStore } from "@/store";
+import { filterExpensesByMonth, sortExpensesByDate } from "@/utils/expenseUtils";
 
 type ExpensesListProps = {
   filterId?: string;
@@ -13,7 +13,7 @@ type ExpensesListProps = {
 };
 
 export function ExpensesList({ filterId, filterType, onEditExpense }: ExpensesListProps) {
-  const { expenses, categories, paymentSources, currentMonth, currentYear, deleteExpense } = useAppContext();
+  const { expenses, categories, paymentSources, currentMonth, currentYear, deleteExpense } = useAppStore();
   
   // Filter expenses for current month and optional filter by category or source
   const filteredExpenses = expenses.filter(expense => {
@@ -32,9 +32,7 @@ export function ExpensesList({ filterId, filterType, onEditExpense }: ExpensesLi
   });
   
   // Sort expenses by date (newest first)
-  const sortedExpenses = [...filteredExpenses].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
+  const sortedExpenses = sortExpensesByDate(filteredExpenses);
   
   // Helper function to get category name
   const getCategoryName = (categoryId: string): string => {
@@ -49,9 +47,9 @@ export function ExpensesList({ filterId, filterType, onEditExpense }: ExpensesLi
   };
   
   // Handle delete expense
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm("האם אתה בטוח שברצונך למחוק הוצאה זו?")) {
-      deleteExpense(id);
+      await deleteExpense(id);
     }
   };
 

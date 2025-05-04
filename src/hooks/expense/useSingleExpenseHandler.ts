@@ -1,5 +1,5 @@
 
-import { Expense } from "@/types";
+import { Expense } from "@/types/models";
 import { createBaseExpense } from "@/utils/expenseUtils";
 import { ExpenseFormData } from "./expenseFormTypes";
 import { useToast } from "@/hooks/use-toast";

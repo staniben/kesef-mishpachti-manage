@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { ExpenseCategory } from "@/types";
+import { ExpenseCategory } from "@/types/models";
+import { v4 as uuidv4 } from 'uuid';
 
 interface CategoryFormProps {
   category?: ExpenseCategory;
@@ -30,7 +31,7 @@ export function CategoryForm({ category, onSave, onCancel }: CategoryFormProps) 
     }
     
     onSave({
-      id: category?.id || new Date().getTime().toString(),
+      id: category?.id || uuidv4(),
       name,
       color,
     });

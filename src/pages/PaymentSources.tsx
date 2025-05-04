@@ -1,38 +1,54 @@
 
 import { useState } from "react";
-import { useAppContext } from "@/context/AppContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PaymentSourceForm } from "@/components/PaymentSourceForm";
-import { PaymentSource } from "@/types";
+import { PaymentSource } from "@/types/models";
 import { Plus, Edit, Trash, CreditCard, Wallet } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAppStore } from "@/store";
 
 export default function PaymentSources() {
-  const { paymentSources, addPaymentSource, updatePaymentSource, deletePaymentSource } = useAppContext();
+  const { paymentSources, addPaymentSource, updatePaymentSource, deletePaymentSource } = useAppStore();
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentSource, setCurrentSource] = useState<PaymentSource | undefined>();
 
-  const handleAddSource = (source: PaymentSource) => {
-    addPaymentSource(source);
-    setIsAddDialogOpen(false);
-    toast({
-      title: "אמצעי תשלום נוסף",
-      description: "אמצעי התשלום נוסף בהצלחה",
-    });
+  const handleAddSource = async (source: PaymentSource) => {
+    try {
+      await addPaymentSource(source);
+      setIsAddDialogOpen(false);
+      toast({
+        title: "אמצעי תשלום נוסף",
+        description: "אמצעי התשלום נוסף בהצלחה",
+      });
+    } catch (error) {
+      toast({
+        title: "שגיאה",
+        description: "אירעה שגיאה בהוספת אמצעי התשלום",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleUpdateSource = (source: PaymentSource) => {
-    updatePaymentSource(source.id, source);
-    setIsEditDialogOpen(false);
-    setCurrentSource(undefined);
-    toast({
-      title: "אמצעי תשלום עודכן",
-      description: "פרטי אמצעי התשלום עודכנו בהצלחה",
-    });
+  const handleUpdateSource = async (source: PaymentSource) => {
+    try {
+      await updatePaymentSource(source.id, source);
+      setIsEditDialogOpen(false);
+      setCurrentSource(undefined);
+      toast({
+        title: "אמצעי תשלום עודכן",
+        description: "פרטי אמצעי התשלום עודכנו בהצלחה",
+      });
+    } catch (error) {
+      toast({
+        title: "שגיאה",
+        description: "אירעה שגיאה בעדכון אמצעי התשלום",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleEditClick = (source: PaymentSource) => {
@@ -40,13 +56,21 @@ export default function PaymentSources() {
     setIsEditDialogOpen(true);
   };
 
-  const handleDeleteClick = (source: PaymentSource) => {
+  const handleDeleteClick = async (source: PaymentSource) => {
     if (window.confirm(`האם אתה בטוח שברצונך למחוק את אמצעי התשלום "${source.name}"?`)) {
-      deletePaymentSource(source.id);
-      toast({
-        title: "אמצעי תשלום נמחק",
-        description: "אמצעי התשלום נמחק בהצלחה",
-      });
+      try {
+        await deletePaymentSource(source.id);
+        toast({
+          title: "אמצעי תשלום נמחק",
+          description: "אמצעי התשלום נמחק בהצלחה",
+        });
+      } catch (error) {
+        toast({
+          title: "שגיאה",
+          description: error instanceof Error ? error.message : "אירעה שגיאה במחיקת אמצעי התשלום",
+          variant: "destructive",
+        });
+      }
     }
   };
 

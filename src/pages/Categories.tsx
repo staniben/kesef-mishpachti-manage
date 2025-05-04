@@ -1,38 +1,54 @@
 
 import { useState } from "react";
-import { useAppContext } from "@/context/AppContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CategoryForm } from "@/components/CategoryForm";
-import { ExpenseCategory } from "@/types";
+import { ExpenseCategory } from "@/types/models";
 import { Plus, Edit, Trash } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAppStore } from "@/store";
 
 export default function Categories() {
-  const { categories, addCategory, updateCategory, deleteCategory } = useAppContext();
+  const { categories, addCategory, updateCategory, deleteCategory } = useAppStore();
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentCategory, setCurrentCategory] = useState<ExpenseCategory | undefined>();
 
-  const handleAddCategory = (category: ExpenseCategory) => {
-    addCategory(category);
-    setIsAddDialogOpen(false);
-    toast({
-      title: "קטגוריה נוספה",
-      description: "הקטגוריה נוספה בהצלחה",
-    });
+  const handleAddCategory = async (category: ExpenseCategory) => {
+    try {
+      await addCategory(category);
+      setIsAddDialogOpen(false);
+      toast({
+        title: "קטגוריה נוספה",
+        description: "הקטגוריה נוספה בהצלחה",
+      });
+    } catch (error) {
+      toast({
+        title: "שגיאה",
+        description: "אירעה שגיאה בהוספת הקטגוריה",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleUpdateCategory = (category: ExpenseCategory) => {
-    updateCategory(category.id, category);
-    setIsEditDialogOpen(false);
-    setCurrentCategory(undefined);
-    toast({
-      title: "קטגוריה עודכנה",
-      description: "פרטי הקטגוריה עודכנו בהצלחה",
-    });
+  const handleUpdateCategory = async (category: ExpenseCategory) => {
+    try {
+      await updateCategory(category.id, category);
+      setIsEditDialogOpen(false);
+      setCurrentCategory(undefined);
+      toast({
+        title: "קטגוריה עודכנה",
+        description: "פרטי הקטגוריה עודכנו בהצלחה",
+      });
+    } catch (error) {
+      toast({
+        title: "שגיאה",
+        description: "אירעה שגיאה בעדכון הקטגוריה",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleEditClick = (category: ExpenseCategory) => {
@@ -40,13 +56,21 @@ export default function Categories() {
     setIsEditDialogOpen(true);
   };
 
-  const handleDeleteClick = (category: ExpenseCategory) => {
+  const handleDeleteClick = async (category: ExpenseCategory) => {
     if (window.confirm(`האם אתה בטוח שברצונך למחוק את הקטגוריה "${category.name}"?`)) {
-      deleteCategory(category.id);
-      toast({
-        title: "קטגוריה נמחקה",
-        description: "הקטגוריה נמחקה בהצלחה",
-      });
+      try {
+        await deleteCategory(category.id);
+        toast({
+          title: "קטגוריה נמחקה",
+          description: "הקטגוריה נמחקה בהצלחה",
+        });
+      } catch (error) {
+        toast({
+          title: "שגיאה",
+          description: error instanceof Error ? error.message : "אירעה שגיאה במחיקת הקטגוריה",
+          variant: "destructive",
+        });
+      }
     }
   };
 

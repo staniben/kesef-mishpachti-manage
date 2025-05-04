@@ -15,11 +15,12 @@ import {
 } from "@/components/ui/sidebar";
 import { Link } from "react-router-dom";
 import { ChartPie, CreditCard, Plus, Settings, X } from "lucide-react";
-import { useAppContext } from "@/context/AppContext";
 import { useRef, useEffect } from "react";
+import { useAppStore } from "@/store";
+import { calculateTotalExpenses } from "@/utils/expenseUtils";
 
 export function AppSidebar() {
-  const { expenses, categories, paymentSources } = useAppContext();
+  const { expenses, categories, paymentSources } = useAppStore();
   const { openMobile, setOpenMobile, isMobile, open, setOpen } = useSidebar();
   const sidebarRef = useRef<HTMLDivElement>(null);
 
@@ -47,6 +48,15 @@ export function AppSidebar() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isMobile, openMobile, open, setOpenMobile, setOpen]);
+
+  // Handle menu item click to close the sidebar
+  const handleMenuItemClick = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    } else {
+      setOpen(false);
+    }
+  };
 
   const menuItems = [
     {
@@ -76,6 +86,8 @@ export function AppSidebar() {
     },
   ];
 
+  const totalExpenses = calculateTotalExpenses(expenses);
+
   return (
     <Sidebar variant="floating" collapsible="offcanvas" ref={sidebarRef}>
       <SidebarHeader className="p-4 flex justify-between items-center">
@@ -91,7 +103,11 @@ export function AppSidebar() {
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <Link to={item.url} className="flex items-center gap-2">
+                    <Link 
+                      to={item.url} 
+                      className="flex items-center gap-2"
+                      onClick={handleMenuItemClick}
+                    >
                       <item.icon className="h-5 w-5" />
                       <span>{item.title}</span>
                     </Link>
@@ -107,7 +123,7 @@ export function AppSidebar() {
           <SidebarGroupContent className="p-3">
             <div className="text-sm">
               <div className="mb-2">
-                <span className="font-semibold">סה"כ הוצאות:</span> {expenses.reduce((sum, expense) => sum + expense.amount, 0).toLocaleString()} ₪
+                <span className="font-semibold">סה"כ הוצאות:</span> {totalExpenses.toLocaleString()} ₪
               </div>
               <div className="mb-2">
                 <span className="font-semibold">קטגוריות:</span> {categories.length}

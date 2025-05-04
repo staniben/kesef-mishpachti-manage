@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { PaymentSource } from "@/types";
+import { PaymentSource } from "@/types/models";
+import { v4 as uuidv4 } from 'uuid';
 
 interface PaymentSourceFormProps {
   source?: PaymentSource;
@@ -32,7 +33,7 @@ export function PaymentSourceForm({ source, onSave, onCancel }: PaymentSourceFor
     }
     
     onSave({
-      id: source?.id || new Date().getTime().toString(),
+      id: source?.id || uuidv4(),
       name,
       type,
       color,

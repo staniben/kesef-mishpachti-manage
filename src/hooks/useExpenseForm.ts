@@ -1,19 +1,26 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAppContext } from "@/context/AppContext";
 import { useToast } from "@/hooks/use-toast";
-import { PaymentType } from "@/types";
+import { PaymentType } from "@/types/models";
 import { format } from "date-fns";
 import { ExpenseFormData } from "./expense/expenseFormTypes";
 import { useSingleExpenseHandler } from "./expense/useSingleExpenseHandler";
 import { useInstallmentExpenseHandler } from "./expense/useInstallmentExpenseHandler";
 import { useRecurringExpenseHandler } from "./expense/useRecurringExpenseHandler";
+import { useAppStore } from "@/store";
 
 export function useExpenseForm(editId?: string) {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { categories, paymentSources, expenses, addExpense, updateExpense, addMultipleExpenses } = useAppContext();
+  const { 
+    categories, 
+    paymentSources, 
+    expenses, 
+    addExpense, 
+    updateExpense, 
+    addMultipleExpenses 
+  } = useAppStore();
   
   const { handleSingleExpense } = useSingleExpenseHandler();
   const { handleInstallmentExpense } = useInstallmentExpenseHandler();
@@ -78,7 +85,7 @@ export function useExpenseForm(editId?: string) {
     setFormData((prev) => ({ ...prev, paymentType }));
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.date || ((formData.paymentType === "installment" || formData.paymentType === "recurring") && !formData.startDate)) {
@@ -95,7 +102,7 @@ export function useExpenseForm(editId?: string) {
     try {
       if (formData.paymentType === "installment") {
         const installmentExpenses = handleInstallmentExpense(formData);
-        addMultipleExpenses(installmentExpenses);
+        await addMultipleExpenses(installmentExpenses);
         
         toast({
           title: "התשלומים נוספו",
@@ -103,7 +110,7 @@ export function useExpenseForm(editId?: string) {
         });
       } else if (formData.paymentType === "recurring") {
         const recurringExpenses = handleRecurringExpense(formData);
-        addMultipleExpenses(recurringExpenses);
+        await addMultipleExpenses(recurringExpenses);
         
         toast({
           title: "התשלומים הקבועים נוספו",
@@ -114,14 +121,14 @@ export function useExpenseForm(editId?: string) {
         
         if (editId) {
           // Update existing expense
-          updateExpense(editId, expense);
+          await updateExpense(editId, expense);
           toast({
             title: "ההוצאה עודכנה",
             description: "פרטי ההוצאה עודכנו בהצלחה",
           });
         } else {
           // Add new expense
-          addExpense(expense);
+          await addExpense(expense);
           
           toast({
             title: "ההוצאה נוספה",

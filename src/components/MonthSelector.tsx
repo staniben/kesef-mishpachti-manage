@@ -1,11 +1,11 @@
 
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useAppContext } from "@/context/AppContext";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useAppStore } from "@/store";
 
 export function MonthSelector() {
-  const { currentMonth, currentYear, setCurrentMonth, setCurrentYear } = useAppContext();
+  const { currentMonth, currentYear, setCurrentMonth, setCurrentYear } = useAppStore();
   
   const months = [
     'ינואר', 'פברואר', 'מרץ', 'אפריל', 

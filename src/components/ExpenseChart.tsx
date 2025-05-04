@@ -1,8 +1,9 @@
 
-import { useAppContext } from "@/context/AppContext";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useAppStore } from "@/store";
+import { filterExpensesByMonth, groupExpensesByCategory, groupExpensesByPaymentSource } from "@/utils/expenseUtils";
 
 type ChartDataItem = {
   name: string;
@@ -14,27 +15,17 @@ type ChartDataItem = {
 type ViewMode = "category" | "source";
 
 export function ExpenseChart({ onSliceClick }: { onSliceClick?: (id: string, type: ViewMode) => void }) {
-  const { expenses, categories, paymentSources, currentMonth, currentYear } = useAppContext();
+  const { expenses, categories, paymentSources, currentMonth, currentYear } = useAppStore();
   const [viewMode, setViewMode] = useState<ViewMode>("category");
 
   // Filter expenses for current month
-  const filteredExpenses = expenses.filter(expense => {
-    const date = new Date(expense.date);
-    return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
-  });
+  const filteredExpenses = filterExpensesByMonth(expenses, currentMonth, currentYear);
 
   // Calculate data for the chart based on view mode
   const calculateChartData = (): ChartDataItem[] => {
     if (viewMode === "category") {
       // Group by category
-      const categoryTotals: Record<string, number> = {};
-      filteredExpenses.forEach(expense => {
-        if (categoryTotals[expense.categoryId]) {
-          categoryTotals[expense.categoryId] += expense.amount;
-        } else {
-          categoryTotals[expense.categoryId] = expense.amount;
-        }
-      });
+      const categoryTotals = groupExpensesByCategory(filteredExpenses);
       
       // Map to chart data
       return Object.entries(categoryTotals).map(([categoryId, total]) => {
@@ -48,14 +39,7 @@ export function ExpenseChart({ onSliceClick }: { onSliceClick?: (id: string, typ
       });
     } else {
       // Group by payment source
-      const sourceTotals: Record<string, number> = {};
-      filteredExpenses.forEach(expense => {
-        if (sourceTotals[expense.paymentSourceId]) {
-          sourceTotals[expense.paymentSourceId] += expense.amount;
-        } else {
-          sourceTotals[expense.paymentSourceId] = expense.amount;
-        }
-      });
+      const sourceTotals = groupExpensesByPaymentSource(filteredExpenses);
       
       // Map to chart data
       return Object.entries(sourceTotals).map(([sourceId, total]) => {

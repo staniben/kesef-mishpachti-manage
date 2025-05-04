@@ -1,8 +1,7 @@
 
-import { Expense, RecurrenceType } from "@/types";
+import { Expense, RecurrenceType } from "@/types/models";
 import { ExpenseFormData } from "./expenseFormTypes";
-import { format, addMonths } from "date-fns";
-import { v4 as uuidv4 } from 'uuid';
+import { generateRecurringExpenses } from "@/utils/expenseUtils";
 import { useToast } from "@/hooks/use-toast";
 
 export function useRecurringExpenseHandler() {
@@ -18,35 +17,14 @@ export function useRecurringExpenseHandler() {
       throw new Error("יש להזין תאריך התחלה");
     }
     
-    // Generate a unique recurrence ID
-    const recurrenceId = uuidv4();
-    const recurrenceType: RecurrenceType = "monthly";
-    
-    // Create 12 monthly recurring expenses
-    const recurringExpenses: Expense[] = [];
-    
-    for (let i = 0; i < 12; i++) {
-      const recurringDate = addMonths(formData.startDate, i);
-      const formattedDate = format(recurringDate, "yyyy-MM-dd");
-      
-      const expense: Expense = {
-        id: new Date().getTime().toString() + "-recurring-" + i, // Ensure unique IDs
-        amount: amount,
-        date: formattedDate,
-        time: formData.time,
-        name: formData.name,
-        categoryId: formData.categoryId,
-        paymentSourceId: formData.paymentSourceId,
-        paymentType: "recurring",
-        isRecurring: true,
-        recurrenceId: recurrenceId,
-        recurrenceType: recurrenceType
-      };
-      
-      recurringExpenses.push(expense);
-    }
-    
-    return recurringExpenses;
+    return generateRecurringExpenses(
+      amount,
+      formData.startDate,
+      formData.name,
+      formData.categoryId,
+      formData.paymentSourceId,
+      formData.time
+    );
   };
 
   return {
