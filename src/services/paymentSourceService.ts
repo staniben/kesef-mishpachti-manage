@@ -18,7 +18,7 @@ const mapModelToDbSource = (source: PaymentSource) => ({
   id: source.id,
   name: source.name,
   type: source.type,
-  color: source.color,
+  color: source.color || "#2196F3", // Ensure color has a default value
   created_at: source.createdAt,
   updated_at: source.updatedAt,
   user_id: null // Will be set in each method with the authenticated user's ID
@@ -76,10 +76,14 @@ export const paymentSourceService = {
       throw new Error('User not authenticated');
     }
     
-    const dbSource = mapModelToDbSource({
+    // Ensure required fields are present and defaults are applied
+    const sourceWithDefaults = {
       ...source,
+      color: source.color || "#2196F3", // Default blue color if not provided
       id: source.id || generateId(),
-    });
+    };
+    
+    const dbSource = mapModelToDbSource(sourceWithDefaults);
     
     // Set the user_id from authenticated session
     dbSource.user_id = userData.user.id;
@@ -97,6 +101,10 @@ export const paymentSourceService = {
       throw error;
     }
 
+    if (!data) {
+      throw new Error('No data returned from payment source creation');
+    }
+
     return mapDbSourceToModel(data);
   },
 
@@ -112,7 +120,7 @@ export const paymentSourceService = {
     
     if (sourceData.name !== undefined) dbSourceUpdate.name = sourceData.name;
     if (sourceData.type !== undefined) dbSourceUpdate.type = sourceData.type;
-    if (sourceData.color !== undefined) dbSourceUpdate.color = sourceData.color;
+    if (sourceData.color !== undefined) dbSourceUpdate.color = sourceData.color || "#2196F3";
     
     const { data, error } = await supabase
       .from('payment_sources')

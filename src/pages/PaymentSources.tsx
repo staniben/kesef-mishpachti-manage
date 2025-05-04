@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -8,16 +8,72 @@ import { PaymentSource } from "@/types/models";
 import { Plus, Edit, Trash, CreditCard, Wallet } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAppStore } from "@/store";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function PaymentSources() {
-  const { paymentSources, addPaymentSource, updatePaymentSource, deletePaymentSource } = useAppStore();
+  const { paymentSources, addPaymentSource, updatePaymentSource, deletePaymentSource, fetchPaymentSources } = useAppStore();
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentSource, setCurrentSource] = useState<PaymentSource | undefined>();
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Fetch payment sources when the component mounts
+  useEffect(() => {
+    const loadPaymentSources = async () => {
+      try {
+        setIsLoading(true);
+        await fetchPaymentSources();
+      } catch (error) {
+        console.error("Error loading payment sources:", error);
+        toast({
+          title: "שגיאה",
+          description: "אירעה שגיאה בטעינת אמצעי התשלום",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadPaymentSources();
+  }, [fetchPaymentSources, toast]);
+
+  // Set up real-time subscription to payment_sources table
+  useEffect(() => {
+    const { data: authData } = supabase.auth.getSession();
+    
+    if (!authData.session?.user) {
+      return; // No need to subscribe if user is not authenticated
+    }
+    
+    // Subscribe to changes on the payment_sources table
+    const channel = supabase
+      .channel('payment_sources_channel')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'payment_sources',
+          filter: `user_id=eq.${authData.session.user.id}`,
+        },
+        () => {
+          // Refresh data when changes occur
+          fetchPaymentSources();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchPaymentSources]);
 
   const handleAddSource = async (source: PaymentSource) => {
     try {
+      setIsLoading(true);
+      console.log("Adding payment source:", source);
       await addPaymentSource(source);
       setIsAddDialogOpen(false);
       toast({
@@ -25,16 +81,21 @@ export default function PaymentSources() {
         description: "אמצעי התשלום נוסף בהצלחה",
       });
     } catch (error) {
+      console.error("Error adding payment source:", error);
       toast({
         title: "שגיאה",
-        description: "אירעה שגיאה בהוספת אמצעי התשלום",
+        description: error instanceof Error ? error.message : "אירעה שגיאה בהוספת אמצעי התשלום",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleUpdateSource = async (source: PaymentSource) => {
     try {
+      setIsLoading(true);
+      console.log("Updating payment source:", source);
       await updatePaymentSource(source.id, source);
       setIsEditDialogOpen(false);
       setCurrentSource(undefined);
@@ -43,11 +104,14 @@ export default function PaymentSources() {
         description: "פרטי אמצעי התשלום עודכנו בהצלחה",
       });
     } catch (error) {
+      console.error("Error updating payment source:", error);
       toast({
         title: "שגיאה",
-        description: "אירעה שגיאה בעדכון אמצעי התשלום",
+        description: error instanceof Error ? error.message : "אירעה שגיאה בעדכון אמצעי התשלום",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -59,17 +123,22 @@ export default function PaymentSources() {
   const handleDeleteClick = async (source: PaymentSource) => {
     if (window.confirm(`האם אתה בטוח שברצונך למחוק את אמצעי התשלום "${source.name}"?`)) {
       try {
+        setIsLoading(true);
+        console.log("Deleting payment source:", source.id);
         await deletePaymentSource(source.id);
         toast({
           title: "אמצעי תשלום נמחק",
           description: "אמצעי התשלום נמחק בהצלחה",
         });
       } catch (error) {
+        console.error("Error deleting payment source:", error);
         toast({
           title: "שגיאה",
           description: error instanceof Error ? error.message : "אירעה שגיאה במחיקת אמצעי התשלום",
           variant: "destructive",
         });
+      } finally {
+        setIsLoading(false);
       }
     }
   };
@@ -104,11 +173,20 @@ export default function PaymentSources() {
     <div className="space-y-6">
       <div className="flex flex-wrap justify-between items-center gap-4">
         <h1 className="text-3xl font-bold">אמצעי תשלום</h1>
-        <Button onClick={() => setIsAddDialogOpen(true)}>
+        <Button onClick={() => setIsAddDialogOpen(true)} disabled={isLoading}>
           <Plus className="h-4 w-4 ml-2" />
           הוסף אמצעי תשלום
         </Button>
       </div>
+
+      {isLoading && <div className="text-center py-4">טוען אמצעי תשלום...</div>}
+
+      {!isLoading && paymentSources.length === 0 && (
+        <div className="text-center py-8 text-muted-foreground">
+          <p>לא נמצאו אמצעי תשלום</p>
+          <p>לחץ על "הוסף אמצעי תשלום" כדי להתחיל</p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         {paymentSources.map((source) => (
@@ -118,7 +196,7 @@ export default function PaymentSources() {
                 <div className="flex items-center gap-2">
                   <div
                     className="w-4 h-4 rounded-full"
-                    style={{ backgroundColor: source.color }}
+                    style={{ backgroundColor: source.color || "#2196F3" }}
                   />
                   <div>
                     <CardTitle className="text-lg">{source.name}</CardTitle>

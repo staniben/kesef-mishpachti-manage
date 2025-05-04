@@ -1,111 +1,137 @@
 
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
-import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/hooks/use-toast";
+import { RememberMeCheckbox } from "@/components/ui/RememberMeCheckbox";
 
 export default function Auth() {
-  const navigate = useNavigate();
+  const { signIn, signUp } = useAuth();
   const { toast } = useToast();
-  const { user, signIn, signUp } = useAuth();
   
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [email, setEmail] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
-  const [stayConnected, setStayConnected] = useState<boolean>(true);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [persistSession, setPersistSession] = useState(true);
+  const [loginLoading, setLoginLoading] = useState(false);
   
-  // Redirect if user is already logged in
-  useEffect(() => {
-    if (user) {
-      navigate("/");
-    }
-  }, [user, navigate]);
+  const [registerEmail, setRegisterEmail] = useState("");
+  const [registerPassword, setRegisterPassword] = useState("");
+  const [registerConfirmPassword, setRegisterConfirmPassword] = useState("");
+  const [registerLoading, setRegisterLoading] = useState(false);
   
-  const handleSignIn = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     
-    try {
-      await signIn(email, password, stayConnected);
+    if (!loginEmail || !loginPassword) {
       toast({
-        title: "התחברת בהצלחה!",
-        description: "ברוך הבא לאפליקציית ניהול ההוצאות",
+        title: "שגיאה",
+        description: "נא למלא את כל השדות",
+        variant: "destructive",
       });
-      navigate("/");
+      return;
+    }
+    
+    setLoginLoading(true);
+    try {
+      console.log(`Attempting login with persistSession=${persistSession}`);
+      await signIn(loginEmail, loginPassword, persistSession);
+      toast({
+        title: "התחברות בוצעה בהצלחה",
+        description: "ברוך הבא למערכת",
+      });
     } catch (error) {
       console.error("Login error:", error);
       toast({
         title: "שגיאה בהתחברות",
-        description: "אימייל או סיסמה שגויים",
+        description: error instanceof Error ? error.message : "אירעה שגיאה בהתחברות",
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setLoginLoading(false);
     }
   };
   
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     
-    try {
-      await signUp(email, password);
+    if (!registerEmail || !registerPassword || !registerConfirmPassword) {
       toast({
-        title: "נרשמת בהצלחה!",
-        description: "ברוכים הבאים לאפליקציית ניהול ההוצאות",
+        title: "שגיאה",
+        description: "נא למלא את כל השדות",
+        variant: "destructive",
       });
-    } catch (error: any) {
+      return;
+    }
+    
+    if (registerPassword !== registerConfirmPassword) {
+      toast({
+        title: "שגיאה",
+        description: "סיסמאות אינן תואמות",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (registerPassword.length < 6) {
+      toast({
+        title: "שגיאה",
+        description: "הסיסמה חייבת להכיל לפחות 6 תווים",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setRegisterLoading(true);
+    try {
+      await signUp(registerEmail, registerPassword);
+      toast({
+        title: "הרשמה בוצעה בהצלחה",
+        description: "בדוק את הדואר האלקטרוני שלך להשלמת ההרשמה",
+      });
+      
+      // Clear form
+      setRegisterEmail("");
+      setRegisterPassword("");
+      setRegisterConfirmPassword("");
+    } catch (error) {
       console.error("Registration error:", error);
-      let errorMessage = "אירעה שגיאה במהלך ההרשמה";
-      
-      if (error.message?.includes("already registered")) {
-        errorMessage = "כתובת המייל כבר רשומה במערכת";
-      }
-      
       toast({
         title: "שגיאה בהרשמה",
-        description: errorMessage,
+        description: error instanceof Error ? error.message : "אירעה שגיאה בהרשמה",
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setRegisterLoading(false);
     }
   };
   
   return (
-    <div className="flex min-h-[80vh] items-center justify-center">
-      <Card className="w-[350px] md:w-[450px]">
-        <Tabs defaultValue="login" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="login">התחברות</TabsTrigger>
-            <TabsTrigger value="register">הרשמה</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="login">
-            <form onSubmit={handleSignIn}>
-              <CardHeader>
-                <CardTitle className="text-xl">התחברות</CardTitle>
-                <CardDescription>
-                  הזן את פרטי ההתחברות שלך להמשך
-                </CardDescription>
-              </CardHeader>
-              
-              <CardContent className="space-y-4">
+    <div className="container mx-auto flex items-center justify-center min-h-screen px-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl">מערכת ניהול הוצאות</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="login">
+            <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsTrigger value="login">התחברות</TabsTrigger>
+              <TabsTrigger value="register">הרשמה</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="login">
+              <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="login-email">כתובת מייל</Label>
+                  <Label htmlFor="login-email">דוא״ל</Label>
                   <Input 
                     id="login-email" 
                     type="email" 
-                    placeholder="mail@example.com" 
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
+                    value={loginEmail} 
+                    onChange={(e) => setLoginEmail(e.target.value)} 
+                    placeholder="your@email.com"
                   />
                 </div>
                 
@@ -114,54 +140,37 @@ export default function Auth() {
                   <Input 
                     id="login-password" 
                     type="password" 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
+                    value={loginPassword} 
+                    onChange={(e) => setLoginPassword(e.target.value)}
                   />
                 </div>
                 
-                <div className="flex items-center space-x-2 space-x-reverse">
-                  <Checkbox 
-                    id="stay-connected" 
-                    checked={stayConnected} 
-                    onCheckedChange={(checked) => setStayConnected(checked === true)}
-                  />
-                  <Label 
-                    htmlFor="stay-connected" 
-                    className="text-sm cursor-pointer"
-                  >
-                    השאר אותי מחובר
-                  </Label>
-                </div>
-              </CardContent>
-              
-              <CardFooter>
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? "מתחבר..." : "התחברות"}
+                <RememberMeCheckbox 
+                  checked={persistSession} 
+                  onCheckedChange={(checked) => setPersistSession(checked)} 
+                  className="my-4"
+                />
+                
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={loginLoading}
+                >
+                  {loginLoading ? "מתחבר..." : "התחבר"}
                 </Button>
-              </CardFooter>
-            </form>
-          </TabsContent>
-          
-          <TabsContent value="register">
-            <form onSubmit={handleSignUp}>
-              <CardHeader>
-                <CardTitle className="text-xl">הרשמה</CardTitle>
-                <CardDescription>
-                  צור חשבון חדש להתחלת השימוש
-                </CardDescription>
-              </CardHeader>
-              
-              <CardContent className="space-y-4">
+              </form>
+            </TabsContent>
+            
+            <TabsContent value="register">
+              <form onSubmit={handleRegister} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="register-email">כתובת מייל</Label>
+                  <Label htmlFor="register-email">דוא״ל</Label>
                   <Input 
                     id="register-email" 
                     type="email" 
-                    placeholder="mail@example.com" 
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
+                    value={registerEmail} 
+                    onChange={(e) => setRegisterEmail(e.target.value)} 
+                    placeholder="your@email.com"
                   />
                 </div>
                 
@@ -170,21 +179,32 @@ export default function Auth() {
                   <Input 
                     id="register-password" 
                     type="password" 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
+                    value={registerPassword} 
+                    onChange={(e) => setRegisterPassword(e.target.value)}
                   />
                 </div>
-              </CardContent>
-              
-              <CardFooter>
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? "נרשם..." : "הרשמה"}
+                
+                <div className="space-y-2">
+                  <Label htmlFor="register-confirm-password">אימות סיסמה</Label>
+                  <Input 
+                    id="register-confirm-password" 
+                    type="password" 
+                    value={registerConfirmPassword} 
+                    onChange={(e) => setRegisterConfirmPassword(e.target.value)}
+                  />
+                </div>
+                
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={registerLoading}
+                >
+                  {registerLoading ? "נרשם..." : "הרשם"}
                 </Button>
-              </CardFooter>
-            </form>
-          </TabsContent>
-        </Tabs>
+              </form>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
       </Card>
     </div>
   );

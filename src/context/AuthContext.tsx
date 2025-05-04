@@ -49,35 +49,76 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string, persistSession = true) => {
-    // Configure auth storage based on persistSession preference
-    if (!persistSession) {
-      // Use sessionStorage for temporary sessions
-      supabase.auth.setSession({
-        access_token: '',
-        refresh_token: '',
+    try {
+      console.log(`Signing in with persistence: ${persistSession}`);
+      
+      // Configure storage based on persistence preference
+      if (!persistSession) {
+        // Use sessionStorage for temporary sessions
+        console.log("Using sessionStorage for auth session");
+        
+        // This will clear any existing session
+        await supabase.auth.signOut();
+        
+        // Configure supabase client to use sessionStorage
+        supabase.auth.setSession({
+          access_token: '',
+          refresh_token: '',
+        });
+      } else {
+        console.log("Using localStorage for persistent auth session");
+        // Default behavior uses localStorage
+      }
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
+      
+      if (error) {
+        console.error("Sign in error:", error.message);
+        throw error;
+      }
+      
+      console.log("Sign in successful, session established:", !!data.session);
+      
+    } catch (error) {
+      console.error("Sign in error:", error);
+      throw error;
     }
-    
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) throw error;
   };
 
   const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-
-    if (error) throw error;
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+  
+      if (error) {
+        console.error("Sign up error:", error.message);
+        throw error;
+      }
+      
+      console.log("Sign up successful");
+    } catch (error) {
+      console.error("Sign up error:", error);
+      throw error;
+    }
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error("Sign out error:", error.message);
+        throw error;
+      }
+      console.log("Sign out successful");
+    } catch (error) {
+      console.error("Sign out error:", error);
+      throw error;
+    }
   };
 
   const value = {

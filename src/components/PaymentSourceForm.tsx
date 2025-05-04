@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { PaymentSource } from "@/types/models";
 import { v4 as uuidv4 } from 'uuid';
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface PaymentSourceFormProps {
   source?: PaymentSource;
@@ -19,30 +20,47 @@ export function PaymentSourceForm({ source, onSave, onCancel }: PaymentSourceFor
   const [name, setName] = useState(source?.name || "");
   const [type, setType] = useState<"cash" | "credit" | "bank" | "other">(source?.type || "credit");
   const [color, setColor] = useState(source?.color || "#2196F3");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
-    if (!name.trim()) {
+    try {
+      if (!name.trim()) {
+        toast({
+          title: "שגיאה",
+          description: "שם אמצעי התשלום לא יכול להיות ריק",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+      
+      const paymentSource: PaymentSource = {
+        id: source?.id || uuidv4(),
+        name: name.trim(),
+        type,
+        color: color || "#2196F3", // Ensure color has a default
+      };
+      
+      console.log("Submitting payment source:", paymentSource);
+      onSave(paymentSource);
+      
+      // Reset form
+      setName("");
+      setType("credit");
+      setColor("#2196F3");
+    } catch (error) {
+      console.error("Error submitting form:", error);
       toast({
         title: "שגיאה",
-        description: "שם אמצעי התשלום לא יכול להיות ריק",
+        description: "אירעה שגיאה בשמירת אמצעי התשלום",
         variant: "destructive",
       });
-      return;
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    onSave({
-      id: source?.id || uuidv4(),
-      name,
-      type,
-      color,
-    });
-    
-    // Reset form
-    setName("");
-    setType("credit");
-    setColor("#2196F3");
   };
   
   return (
@@ -97,11 +115,11 @@ export function PaymentSourceForm({ source, onSave, onCancel }: PaymentSourceFor
       </div>
       
       <div className="flex justify-end gap-2 pt-2">
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
           ביטול
         </Button>
-        <Button type="submit">
-          {source ? "עדכון" : "הוספה"}
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "שומר..." : source ? "עדכון" : "הוספה"}
         </Button>
       </div>
     </form>
