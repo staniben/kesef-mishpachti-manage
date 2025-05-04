@@ -3,6 +3,27 @@ import { PaymentSource } from '@/types/models';
 import { supabase } from '@/integrations/supabase/client';
 import { generateId } from './mockData';
 
+// Map DB schema to frontend model
+const mapDbSourceToModel = (dbSource: any): PaymentSource => ({
+  id: dbSource.id,
+  name: dbSource.name,
+  type: dbSource.type,
+  color: dbSource.color,
+  createdAt: dbSource.created_at,
+  updatedAt: dbSource.updated_at
+});
+
+// Map frontend model to DB schema
+const mapModelToDbSource = (source: PaymentSource, userId?: string) => ({
+  id: source.id,
+  name: source.name,
+  type: source.type,
+  color: source.color,
+  created_at: source.createdAt,
+  updated_at: source.updatedAt,
+  user_id: userId
+});
+
 export const paymentSourceService = {
   getAll: async (): Promise<PaymentSource[]> => {
     const { data, error } = await supabase
@@ -14,7 +35,7 @@ export const paymentSourceService = {
       throw error;
     }
 
-    return data || [];
+    return data ? data.map(mapDbSourceToModel) : [];
   },
 
   getById: async (id: string): Promise<PaymentSource | null> => {
@@ -29,21 +50,27 @@ export const paymentSourceService = {
       throw error;
     }
 
-    return data;
+    return data ? mapDbSourceToModel(data) : null;
   },
 
   create: async (source: PaymentSource): Promise<PaymentSource> => {
-    const user = supabase.auth.getUser();
+    const { data: userData } = await supabase.auth.getUser();
     
-    const newSource = {
-      ...source,
-      id: source.id || generateId(),
-      user_id: (await user).data.user?.id,
-    };
+    if (!userData?.user) {
+      throw new Error('User not authenticated');
+    }
+    
+    const dbSource = mapModelToDbSource(
+      {
+        ...source,
+        id: source.id || generateId(),
+      },
+      userData.user.id
+    );
     
     const { data, error } = await supabase
       .from('payment_sources')
-      .insert(newSource)
+      .insert(dbSource)
       .select()
       .single();
 
@@ -52,13 +79,20 @@ export const paymentSourceService = {
       throw error;
     }
 
-    return data;
+    return mapDbSourceToModel(data);
   },
 
   update: async (id: string, sourceData: Partial<PaymentSource>): Promise<PaymentSource> => {
+    // Map the partial update data to DB format
+    const dbSourceUpdate: Record<string, any> = {};
+    
+    if (sourceData.name !== undefined) dbSourceUpdate.name = sourceData.name;
+    if (sourceData.type !== undefined) dbSourceUpdate.type = sourceData.type;
+    if (sourceData.color !== undefined) dbSourceUpdate.color = sourceData.color;
+    
     const { data, error } = await supabase
       .from('payment_sources')
-      .update(sourceData)
+      .update(dbSourceUpdate)
       .eq('id', id)
       .select()
       .single();
@@ -68,7 +102,7 @@ export const paymentSourceService = {
       throw error;
     }
 
-    return data;
+    return mapDbSourceToModel(data);
   },
 
   delete: async (id: string): Promise<void> => {

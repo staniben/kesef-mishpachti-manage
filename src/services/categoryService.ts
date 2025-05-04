@@ -3,6 +3,25 @@ import { ExpenseCategory } from '@/types/models';
 import { supabase } from '@/integrations/supabase/client';
 import { generateId } from './mockData';
 
+// Map DB schema to frontend model
+const mapDbCategoryToModel = (dbCategory: any): ExpenseCategory => ({
+  id: dbCategory.id,
+  name: dbCategory.name,
+  color: dbCategory.color || '#3B82F6', // Default color if not provided
+  createdAt: dbCategory.created_at,
+  updatedAt: dbCategory.updated_at
+});
+
+// Map frontend model to DB schema
+const mapModelToDbCategory = (category: ExpenseCategory, userId?: string) => ({
+  id: category.id,
+  name: category.name,
+  color: category.color,
+  created_at: category.createdAt,
+  updated_at: category.updatedAt,
+  user_id: userId
+});
+
 export const categoryService = {
   getAll: async (): Promise<ExpenseCategory[]> => {
     const { data, error } = await supabase
@@ -14,7 +33,7 @@ export const categoryService = {
       throw error;
     }
 
-    return data || [];
+    return data ? data.map(mapDbCategoryToModel) : [];
   },
 
   getById: async (id: string): Promise<ExpenseCategory | null> => {
@@ -29,21 +48,27 @@ export const categoryService = {
       throw error;
     }
 
-    return data;
+    return data ? mapDbCategoryToModel(data) : null;
   },
 
   create: async (category: ExpenseCategory): Promise<ExpenseCategory> => {
-    const user = supabase.auth.getUser();
+    const { data: userData } = await supabase.auth.getUser();
     
-    const newCategory = {
-      ...category,
-      id: category.id || generateId(),
-      user_id: (await user).data.user?.id,
-    };
+    if (!userData?.user) {
+      throw new Error('User not authenticated');
+    }
+    
+    const dbCategory = mapModelToDbCategory(
+      {
+        ...category,
+        id: category.id || generateId(),
+      },
+      userData.user.id
+    );
     
     const { data, error } = await supabase
       .from('categories')
-      .insert(newCategory)
+      .insert(dbCategory)
       .select()
       .single();
 
@@ -52,13 +77,19 @@ export const categoryService = {
       throw error;
     }
 
-    return data;
+    return mapDbCategoryToModel(data);
   },
 
   update: async (id: string, categoryData: Partial<ExpenseCategory>): Promise<ExpenseCategory> => {
+    // Map the partial update data to DB format
+    const dbCategoryUpdate: Record<string, any> = {};
+    
+    if (categoryData.name !== undefined) dbCategoryUpdate.name = categoryData.name;
+    if (categoryData.color !== undefined) dbCategoryUpdate.color = categoryData.color;
+    
     const { data, error } = await supabase
       .from('categories')
-      .update(categoryData)
+      .update(dbCategoryUpdate)
       .eq('id', id)
       .select()
       .single();
@@ -68,26 +99,17 @@ export const categoryService = {
       throw error;
     }
 
-    return data;
+    return mapDbCategoryToModel(data);
   },
 
   delete: async (id: string): Promise<void> => {
-    // First check how many categories the user has
-    const { count, error: countError } = await supabase
-      .from('categories')
-      .select('*', { count: 'exact', head: true });
+    // First delete all expenses with this category
+    await supabase
+      .from('expenses')
+      .delete()
+      .eq('category_id', id);
     
-    if (countError) {
-      console.error('Error counting categories:', countError);
-      throw countError;
-    }
-    
-    // Check if this is the last category
-    if (count !== null && count <= 1) {
-      throw new Error('Cannot delete the last category');
-    }
-    
-    // Delete the category
+    // Then delete the category
     const { error } = await supabase
       .from('categories')
       .delete()

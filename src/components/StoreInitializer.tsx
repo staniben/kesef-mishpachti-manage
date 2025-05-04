@@ -3,7 +3,6 @@ import { useEffect } from "react";
 import { useAppStore } from "@/store";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 
 export function StoreInitializer() {
   const { toast } = useToast();

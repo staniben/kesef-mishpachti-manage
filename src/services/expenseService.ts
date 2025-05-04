@@ -3,6 +3,49 @@ import { Expense } from '@/types/models';
 import { supabase } from '@/integrations/supabase/client';
 import { generateId } from './mockData';
 
+// Helper function to map Supabase DB schema to our frontend model
+const mapDbExpenseToModel = (dbExpense: any): Expense => ({
+  id: dbExpense.id,
+  amount: dbExpense.amount,
+  date: dbExpense.date,
+  time: dbExpense.time || '',
+  name: dbExpense.title, // DB uses 'title', frontend uses 'name'
+  categoryId: dbExpense.category_id || '',
+  paymentSourceId: dbExpense.payment_source_id || '',
+  paymentType: dbExpense.payment_type,
+  relatedExpenseId: dbExpense.related_expense_id,
+  installmentNumber: dbExpense.installment_count,
+  totalInstallments: dbExpense.total_installments,
+  isInstallment: dbExpense.installment || false,
+  isRecurring: dbExpense.recurring || false,
+  recurrenceId: dbExpense.recurrence_id,
+  recurrenceType: dbExpense.recurring_interval,
+  createdAt: dbExpense.created_at,
+  updatedAt: dbExpense.updated_at
+});
+
+// Helper function to map frontend model to Supabase DB schema
+const mapModelToDbExpense = (expense: Expense, userId?: string) => ({
+  id: expense.id,
+  title: expense.name, // Frontend uses 'name', DB uses 'title'
+  amount: expense.amount,
+  date: expense.date,
+  time: expense.time,
+  category_id: expense.categoryId,
+  payment_source_id: expense.paymentSourceId,
+  payment_type: expense.paymentType,
+  related_expense_id: expense.relatedExpenseId,
+  installment: expense.isInstallment || false,
+  installment_count: expense.installmentNumber,
+  total_installments: expense.totalInstallments,
+  recurring: expense.isRecurring || false,
+  recurring_interval: expense.recurrenceType,
+  recurrence_id: expense.recurrenceId,
+  created_at: expense.createdAt,
+  updated_at: expense.updatedAt,
+  user_id: userId
+});
+
 export const expenseService = {
   getAll: async (): Promise<Expense[]> => {
     const { data, error } = await supabase
@@ -14,7 +57,7 @@ export const expenseService = {
       throw error;
     }
 
-    return data || [];
+    return data ? data.map(mapDbExpenseToModel) : [];
   },
 
   getById: async (id: string): Promise<Expense | null> => {
@@ -29,7 +72,7 @@ export const expenseService = {
       throw error;
     }
 
-    return data;
+    return data ? mapDbExpenseToModel(data) : null;
   },
 
   getByMonth: async (month: number, year: number): Promise<Expense[]> => {
@@ -48,7 +91,7 @@ export const expenseService = {
       throw error;
     }
 
-    return data || [];
+    return data ? data.map(mapDbExpenseToModel) : [];
   },
   
   getByCategory: async (categoryId: string): Promise<Expense[]> => {
@@ -62,7 +105,7 @@ export const expenseService = {
       throw error;
     }
 
-    return data || [];
+    return data ? data.map(mapDbExpenseToModel) : [];
   },
   
   getByPaymentSource: async (sourceId: string): Promise<Expense[]> => {
@@ -76,21 +119,27 @@ export const expenseService = {
       throw error;
     }
 
-    return data || [];
+    return data ? data.map(mapDbExpenseToModel) : [];
   },
 
   create: async (expense: Expense): Promise<Expense> => {
-    const user = supabase.auth.getUser();
+    const { data: userData } = await supabase.auth.getUser();
     
-    const newExpense = {
-      ...expense,
-      id: expense.id || generateId(),
-      user_id: (await user).data.user?.id,
-    };
+    if (!userData?.user) {
+      throw new Error('User not authenticated');
+    }
+    
+    const dbExpense = mapModelToDbExpense(
+      {
+        ...expense,
+        id: expense.id || generateId(),
+      },
+      userData.user.id
+    );
     
     const { data, error } = await supabase
       .from('expenses')
-      .insert(newExpense)
+      .insert(dbExpense)
       .select()
       .single();
 
@@ -99,23 +148,27 @@ export const expenseService = {
       throw error;
     }
 
-    return data;
+    return mapDbExpenseToModel(data);
   },
   
   createBatch: async (newExpenses: Expense[]): Promise<Expense[]> => {
-    const user = supabase.auth.getUser();
+    const { data: userData } = await supabase.auth.getUser();
     
-    const expensesWithMetadata = await Promise.all(
-      newExpenses.map(async (expense) => ({
+    if (!userData?.user) {
+      throw new Error('User not authenticated');
+    }
+    
+    const dbExpenses = newExpenses.map(expense => mapModelToDbExpense(
+      {
         ...expense,
         id: expense.id || generateId(),
-        user_id: (await user).data.user?.id,
-      }))
-    );
+      },
+      userData.user?.id
+    ));
     
     const { data, error } = await supabase
       .from('expenses')
-      .insert(expensesWithMetadata)
+      .insert(dbExpenses)
       .select();
 
     if (error) {
@@ -123,13 +176,41 @@ export const expenseService = {
       throw error;
     }
 
-    return data || [];
+    return data ? data.map(mapDbExpenseToModel) : [];
   },
 
   update: async (id: string, expenseData: Partial<Expense>): Promise<Expense> => {
+    const { data: userData } = await supabase.auth.getUser();
+    
+    if (!userData?.user) {
+      throw new Error('User not authenticated');
+    }
+    
+    // First get the existing expense to merge with updates
+    const { data: existingExpense } = await supabase
+      .from('expenses')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (!existingExpense) {
+      throw new Error(`Expense with ID ${id} not found`);
+    }
+    
+    // Map the partial update data to DB format
+    const dbExpenseUpdate: Record<string, any> = {};
+    
+    if (expenseData.name !== undefined) dbExpenseUpdate.title = expenseData.name;
+    if (expenseData.amount !== undefined) dbExpenseUpdate.amount = expenseData.amount;
+    if (expenseData.date !== undefined) dbExpenseUpdate.date = expenseData.date;
+    if (expenseData.time !== undefined) dbExpenseUpdate.time = expenseData.time;
+    if (expenseData.categoryId !== undefined) dbExpenseUpdate.category_id = expenseData.categoryId;
+    if (expenseData.paymentSourceId !== undefined) dbExpenseUpdate.payment_source_id = expenseData.paymentSourceId;
+    if (expenseData.paymentType !== undefined) dbExpenseUpdate.payment_type = expenseData.paymentType;
+    
     const { data, error } = await supabase
       .from('expenses')
-      .update(expenseData)
+      .update(dbExpenseUpdate)
       .eq('id', id)
       .select()
       .single();
@@ -139,7 +220,7 @@ export const expenseService = {
       throw error;
     }
 
-    return data;
+    return mapDbExpenseToModel(data);
   },
 
   delete: async (id: string): Promise<void> => {
