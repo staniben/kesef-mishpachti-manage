@@ -54,8 +54,8 @@ const mapModelToDbExpense = (expense: Expense) => {
     recurring: expense.isRecurring || false,
     recurring_interval: expense.recurrenceType,
     recurrence_id: expense.recurrenceId,
-    created_at: expense.createdAt,
-    updated_at: expense.updatedAt,
+    created_at: expense.createdAt || new Date().toISOString(),
+    updated_at: expense.updatedAt || new Date().toISOString(),
     user_id: null // Will be set in each method with the authenticated user's ID
   };
   
@@ -179,66 +179,25 @@ export const expenseService = {
   },
 
   create: async (expense: Expense): Promise<Expense> => {
-    const { data: userData } = await supabase.auth.getUser();
-    
-    if (!userData?.user) {
-      throw new Error('User not authenticated');
-    }
-    
-    // Validate the expense data
-    const validationError = validateExpenseForDB(expense);
-    if (validationError) {
-      throw new Error(validationError);
-    }
-    
-    const dbExpense = mapModelToDbExpense({
-      ...expense,
-      id: expense.id || generateId(),
-    });
-    
-    // Set the user_id from authenticated session
-    dbExpense.user_id = userData.user.id;
-    
-    // Log what we're sending to Supabase for debugging
-    console.log('Creating expense with data:', dbExpense);
-    
-    const { data, error } = await supabase
-      .from('expenses')
-      .insert(dbExpense)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating expense:', error);
-      console.error('Supabase error message:', error.message);
-      console.error('Supabase error details:', error.details);
-      throw error;
-    }
-
-    return mapDbExpenseToModel(data);
-  },
-  
-  createBatch: async (newExpenses: Expense[]): Promise<Expense[]> => {
-    const { data: userData } = await supabase.auth.getUser();
-    
-    if (!userData?.user) {
-      throw new Error('User not authenticated');
-    }
-    
-    // Validate each expense in the batch
-    const validationErrors: string[] = [];
-    newExpenses.forEach((expense, index) => {
-      const error = validateExpenseForDB(expense);
-      if (error) {
-        validationErrors.push(`Expense #${index + 1}: ${error}`);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      
+      if (!userData?.user) {
+        const authError = new Error('User not authenticated');
+        console.error('Authentication error:', authError);
+        throw authError;
       }
-    });
-    
-    if (validationErrors.length > 0) {
-      throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
-    }
-    
-    const dbExpenses = newExpenses.map(expense => {
+      
+      console.log('Creating expense with authenticated user:', userData.user.id);
+      
+      // Validate the expense data
+      const validationError = validateExpenseForDB(expense);
+      if (validationError) {
+        const error = new Error(validationError);
+        console.error('Validation error:', error);
+        throw error;
+      }
+      
       const dbExpense = mapModelToDbExpense({
         ...expense,
         id: expense.id || generateId(),
@@ -246,86 +205,188 @@ export const expenseService = {
       
       // Set the user_id from authenticated session
       dbExpense.user_id = userData.user.id;
-      return dbExpense;
-    });
-    
-    console.log('Creating batch expenses:', dbExpenses);
-    
-    const { data, error } = await supabase
-      .from('expenses')
-      .insert(dbExpenses)
-      .select();
+      
+      // Log what we're sending to Supabase for debugging
+      console.log('Creating expense with data:', dbExpense);
+      
+      const { data, error } = await supabase
+        .from('expenses')
+        .insert(dbExpense)
+        .select()
+        .single();
 
-    if (error) {
-      console.error('Error creating batch expenses:', error);
-      console.error('Supabase error message:', error.message);
-      console.error('Supabase error details:', error.details);
+      if (error) {
+        console.error('Error creating expense:', error);
+        console.error('Supabase error message:', error.message);
+        console.error('Supabase error details:', error.details);
+        throw error;
+      }
+
+      if (!data) {
+        throw new Error('No data returned from expense creation');
+      }
+
+      console.log('Expense created successfully:', data);
+      return mapDbExpenseToModel(data);
+    } catch (error) {
+      console.error('Failed to create expense:', error);
       throw error;
     }
+  },
+  
+  createBatch: async (newExpenses: Expense[]): Promise<Expense[]> => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      
+      if (!userData?.user) {
+        const authError = new Error('User not authenticated');
+        console.error('Authentication error:', authError);
+        throw authError;
+      }
+      
+      console.log('Creating batch expenses with authenticated user:', userData.user.id);
+      
+      // Validate each expense in the batch
+      const validationErrors: string[] = [];
+      newExpenses.forEach((expense, index) => {
+        const error = validateExpenseForDB(expense);
+        if (error) {
+          validationErrors.push(`Expense #${index + 1}: ${error}`);
+        }
+      });
+      
+      if (validationErrors.length > 0) {
+        const error = new Error(`Validation failed: ${validationErrors.join(', ')}`);
+        console.error('Validation errors:', error);
+        throw error;
+      }
+      
+      const dbExpenses = newExpenses.map(expense => {
+        const dbExpense = mapModelToDbExpense({
+          ...expense,
+          id: expense.id || generateId(),
+        });
+        
+        // Set the user_id from authenticated session
+        dbExpense.user_id = userData.user.id;
+        return dbExpense;
+      });
+      
+      console.log('Creating batch expenses:', dbExpenses);
+      
+      const { data, error } = await supabase
+        .from('expenses')
+        .insert(dbExpenses)
+        .select();
 
-    return data ? data.map(mapDbExpenseToModel) : [];
+      if (error) {
+        console.error('Error creating batch expenses:', error);
+        console.error('Supabase error message:', error.message);
+        console.error('Supabase error details:', error.details);
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        throw new Error('No data returned from batch expense creation');
+      }
+
+      console.log('Batch expenses created successfully:', data);
+      return data ? data.map(mapDbExpenseToModel) : [];
+    } catch (error) {
+      console.error('Failed to create batch expenses:', error);
+      throw error;
+    }
   },
 
   update: async (id: string, expenseData: Partial<Expense>): Promise<Expense> => {
-    const { data: userData } = await supabase.auth.getUser();
-    
-    if (!userData?.user) {
-      throw new Error('User not authenticated');
-    }
-    
-    // Map the partial update data to DB format
-    const dbExpenseUpdate: Record<string, any> = {};
-    
-    if (expenseData.name !== undefined) dbExpenseUpdate.title = expenseData.name;
-    if (expenseData.amount !== undefined) dbExpenseUpdate.amount = Number(expenseData.amount);
-    if (expenseData.date !== undefined) dbExpenseUpdate.date = expenseData.date;
-    if (expenseData.time !== undefined) dbExpenseUpdate.time = expenseData.time;
-    if (expenseData.categoryId !== undefined) dbExpenseUpdate.category_id = expenseData.categoryId;
-    if (expenseData.paymentSourceId !== undefined) dbExpenseUpdate.payment_source_id = expenseData.paymentSourceId;
-    if (expenseData.paymentType !== undefined) dbExpenseUpdate.payment_type = expenseData.paymentType;
-    if (expenseData.isInstallment !== undefined) dbExpenseUpdate.installment = expenseData.isInstallment;
-    if (expenseData.installmentNumber !== undefined) dbExpenseUpdate.installment_count = expenseData.installmentNumber;
-    if (expenseData.totalInstallments !== undefined) dbExpenseUpdate.total_installments = expenseData.totalInstallments;
-    if (expenseData.isRecurring !== undefined) dbExpenseUpdate.recurring = expenseData.isRecurring;
-    if (expenseData.recurrenceType !== undefined) dbExpenseUpdate.recurring_interval = expenseData.recurrenceType;
-    if (expenseData.relatedExpenseId !== undefined) dbExpenseUpdate.related_expense_id = expenseData.relatedExpenseId;
-    if (expenseData.recurrenceId !== undefined) dbExpenseUpdate.recurrence_id = expenseData.recurrenceId;
-    
-    console.log(`Updating expense ${id} with data:`, dbExpenseUpdate);
-    
-    const { data, error } = await supabase
-      .from('expenses')
-      .update(dbExpenseUpdate)
-      .eq('id', id)
-      .eq('user_id', userData.user.id) // Ensure user can only update their own expenses
-      .select()
-      .single();
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      
+      if (!userData?.user) {
+        const authError = new Error('User not authenticated');
+        console.error('Authentication error:', authError);
+        throw authError;
+      }
+      
+      console.log(`Updating expense ${id} for user ${userData.user.id}`);
+      
+      // Map the partial update data to DB format
+      const dbExpenseUpdate: Record<string, any> = {
+        updated_at: new Date().toISOString()
+      };
+      
+      if (expenseData.name !== undefined) dbExpenseUpdate.title = expenseData.name;
+      if (expenseData.amount !== undefined) dbExpenseUpdate.amount = Number(expenseData.amount);
+      if (expenseData.date !== undefined) dbExpenseUpdate.date = expenseData.date;
+      if (expenseData.time !== undefined) dbExpenseUpdate.time = expenseData.time;
+      if (expenseData.categoryId !== undefined) dbExpenseUpdate.category_id = expenseData.categoryId;
+      if (expenseData.paymentSourceId !== undefined) dbExpenseUpdate.payment_source_id = expenseData.paymentSourceId;
+      if (expenseData.paymentType !== undefined) dbExpenseUpdate.payment_type = expenseData.paymentType;
+      if (expenseData.isInstallment !== undefined) dbExpenseUpdate.installment = expenseData.isInstallment;
+      if (expenseData.installmentNumber !== undefined) dbExpenseUpdate.installment_count = expenseData.installmentNumber;
+      if (expenseData.totalInstallments !== undefined) dbExpenseUpdate.total_installments = expenseData.totalInstallments;
+      if (expenseData.isRecurring !== undefined) dbExpenseUpdate.recurring = expenseData.isRecurring;
+      if (expenseData.recurrenceType !== undefined) dbExpenseUpdate.recurring_interval = expenseData.recurrenceType;
+      if (expenseData.relatedExpenseId !== undefined) dbExpenseUpdate.related_expense_id = expenseData.relatedExpenseId;
+      if (expenseData.recurrenceId !== undefined) dbExpenseUpdate.recurrence_id = expenseData.recurrenceId;
+      
+      console.log(`Updating expense ${id} with data:`, dbExpenseUpdate);
+      
+      const { data, error } = await supabase
+        .from('expenses')
+        .update(dbExpenseUpdate)
+        .eq('id', id)
+        .eq('user_id', userData.user.id) // Ensure user can only update their own expenses
+        .select()
+        .single();
 
-    if (error) {
-      console.error(`Error updating expense with ID ${id}:`, error);
-      console.error('Supabase error message:', error.message);
-      console.error('Supabase error details:', error.details);
+      if (error) {
+        console.error(`Error updating expense with ID ${id}:`, error);
+        console.error('Supabase error message:', error.message);
+        console.error('Supabase error details:', error.details);
+        throw error;
+      }
+
+      if (!data) {
+        throw new Error(`No data returned from expense update for ID ${id}`);
+      }
+
+      console.log('Expense updated successfully:', data);
+      return mapDbExpenseToModel(data);
+    } catch (error) {
+      console.error(`Failed to update expense ${id}:`, error);
       throw error;
     }
-
-    return mapDbExpenseToModel(data);
   },
 
   delete: async (id: string): Promise<void> => {
-    const { data: userData } = await supabase.auth.getUser();
-    
-    if (!userData?.user) {
-      throw new Error('User not authenticated');
-    }
-    
-    const { error } = await supabase
-      .from('expenses')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', userData.user.id); // Ensure user can only delete their own expenses
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      
+      if (!userData?.user) {
+        const authError = new Error('User not authenticated');
+        console.error('Authentication error:', authError);
+        throw authError;
+      }
+      
+      console.log(`Deleting expense ${id} for user ${userData.user.id}`);
+      
+      const { error } = await supabase
+        .from('expenses')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', userData.user.id); // Ensure user can only delete their own expenses
 
-    if (error) {
-      console.error(`Error deleting expense with ID ${id}:`, error);
+      if (error) {
+        console.error(`Error deleting expense with ID ${id}:`, error);
+        console.error('Supabase error message:', error.message);
+        console.error('Supabase error details:', error.details);
+        throw error;
+      }
+      
+      console.log(`Expense ${id} deleted successfully`);
+    } catch (error) {
+      console.error(`Failed to delete expense ${id}:`, error);
       throw error;
     }
   }

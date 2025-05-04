@@ -85,23 +85,63 @@ export function useExpenseForm(editId?: string) {
     setFormData((prev) => ({ ...prev, paymentType }));
   };
   
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const validateAndPrepare = () => {
+    // Basic validation
     if (!formData.date || ((formData.paymentType === "installment" || formData.paymentType === "recurring") && !formData.startDate)) {
       toast({
         title: "שגיאה",
         description: "יש להזין תאריך",
         variant: "destructive",
       });
+      return false;
+    }
+    
+    // Validate category exists
+    if (formData.categoryId && categories.length > 0) {
+      const categoryExists = categories.some(c => c.id === formData.categoryId);
+      if (!categoryExists) {
+        toast({
+          title: "שגיאה",
+          description: "קטגוריה לא קיימת, אנא בחר קטגוריה אחרת",
+          variant: "destructive",
+        });
+        return false;
+      }
+    }
+    
+    // Validate payment source exists
+    if (formData.paymentSourceId && paymentSources.length > 0) {
+      const sourceExists = paymentSources.some(s => s.id === formData.paymentSourceId);
+      if (!sourceExists) {
+        toast({
+          title: "שגיאה",
+          description: "אמצעי תשלום לא קיים, אנא בחר אמצעי תשלום אחר",
+          variant: "destructive",
+        });
+        return false;
+      }
+    }
+    
+    return true;
+  };
+  
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateAndPrepare()) {
       return;
     }
     
     setIsSubmitting(true);
     
     try {
+      console.log('Form submission started with data:', formData);
+      
       if (formData.paymentType === "installment") {
+        console.log('Handling installment expense');
         const installmentExpenses = handleInstallmentExpense(formData);
+        console.log('Installment expenses ready for saving:', installmentExpenses);
+        
         await addMultipleExpenses(installmentExpenses);
         
         toast({
@@ -109,7 +149,10 @@ export function useExpenseForm(editId?: string) {
           description: `נוספו ${installmentExpenses.length} תשלומים בהצלחה`,
         });
       } else if (formData.paymentType === "recurring") {
+        console.log('Handling recurring expense');
         const recurringExpenses = handleRecurringExpense(formData);
+        console.log('Recurring expenses ready for saving:', recurringExpenses);
+        
         await addMultipleExpenses(recurringExpenses);
         
         toast({
@@ -117,7 +160,9 @@ export function useExpenseForm(editId?: string) {
           description: "נוספו 12 תשלומים קבועים בהצלחה",
         });
       } else {
+        console.log('Handling single expense');
         const expense = handleSingleExpense(formData, editId);
+        console.log('Single expense ready for saving:', expense);
         
         if (editId) {
           // Update existing expense
@@ -137,6 +182,8 @@ export function useExpenseForm(editId?: string) {
         }
       }
       
+      console.log('Form submission completed successfully');
+      
       // Navigate back to the dashboard after adding/editing
       navigate("/");
     } catch (error) {
@@ -147,8 +194,23 @@ export function useExpenseForm(editId?: string) {
       if (error instanceof Error) {
         console.error("Error details:", error.message);
         // Show more detailed error in development or for specific errors
-        if (process.env.NODE_ENV === 'development' || error.message.includes("נדרש")) {
+        if (process.env.NODE_ENV === 'development' || error.message.includes("נדרש") || error.message.includes("auth")) {
           errorMessage = error.message;
+        }
+        
+        // Handle Supabase-specific errors
+        if (typeof error === 'object' && error !== null && 'code' in error) {
+          const supabaseError = error as { code: string; message: string; details?: string };
+          console.error("Supabase error code:", supabaseError.code);
+          console.error("Supabase error details:", supabaseError.details);
+          
+          if (supabaseError.code === '42501') {
+            errorMessage = "אין לך הרשאות מתאימות לבצע פעולה זו";
+          } else if (supabaseError.code === '23505') {
+            errorMessage = "רשומה עם מזהה זהה כבר קיימת במערכת";
+          } else if (supabaseError.code === '23503') {
+            errorMessage = "הפנייה לקטגוריה או לאמצעי תשלום שאינם קיימים במערכת";
+          }
         }
       }
       
