@@ -10,14 +10,43 @@ import {
   SidebarMenuItem,
   SidebarHeader,
   SidebarFooter,
-  SidebarTrigger
+  SidebarTrigger,
+  useSidebar
 } from "@/components/ui/sidebar";
 import { Link } from "react-router-dom";
-import { ChartPie, CreditCard, Plus, Settings, Wallet, X } from "lucide-react";
+import { ChartPie, CreditCard, Plus, Settings, X } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
+import { useRef, useEffect } from "react";
 
 export function AppSidebar() {
   const { expenses, categories, paymentSources } = useAppContext();
+  const { openMobile, setOpenMobile, isMobile, open, setOpen } = useSidebar();
+  const sidebarRef = useRef<HTMLDivElement>(null);
+
+  // Handle clicks outside the sidebar to close it
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
+        // Close mobile sidebar when it's open
+        if (isMobile && openMobile) {
+          setOpenMobile(false);
+        }
+        // Close desktop sidebar when it's open (only in floating/offcanvas mode)
+        else if (!isMobile && open) {
+          setOpen(false);
+        }
+      }
+    }
+
+    // Only add the event listener when the sidebar is open
+    if ((isMobile && openMobile) || (!isMobile && open)) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isMobile, openMobile, open, setOpenMobile, setOpen]);
 
   const menuItems = [
     {
@@ -48,7 +77,7 @@ export function AppSidebar() {
   ];
 
   return (
-    <Sidebar variant="floating" collapsible="offcanvas">
+    <Sidebar variant="floating" collapsible="offcanvas" ref={sidebarRef}>
       <SidebarHeader className="p-4 flex justify-between items-center">
         <h2 className="text-lg font-bold">ניהול תקציב</h2>
         <SidebarTrigger className="h-8 w-8">
