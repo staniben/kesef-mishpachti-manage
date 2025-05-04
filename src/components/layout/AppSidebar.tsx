@@ -13,7 +13,7 @@ import {
   SidebarTrigger,
   useSidebar
 } from "@/components/ui/sidebar";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { ChartPie, CreditCard, Plus, Settings, X } from "lucide-react";
 import { useAppContext } from "@/context/AppContext";
 import { useRef, useEffect } from "react";
@@ -22,25 +22,6 @@ export function AppSidebar() {
   const { expenses, categories, paymentSources } = useAppContext();
   const { openMobile, setOpenMobile, isMobile, open, setOpen } = useSidebar();
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const location = useLocation();
-
-  // Close sidebar when route changes
-  useEffect(() => {
-    const handleRouteChange = () => {
-      if (isMobile && openMobile) {
-        setOpenMobile(false);
-      }
-      // For desktop, only close when in offcanvas mode
-      else if (!isMobile && open) {
-        setOpen(false);
-      }
-    };
-    
-    // Call the handler when the location changes
-    handleRouteChange();
-    
-    // No need for a cleanup function as we're not setting up any listeners here
-  }, [location, isMobile, openMobile, setOpenMobile, open, setOpen]);
 
   // Handle clicks outside the sidebar to close it
   useEffect(() => {
@@ -95,15 +76,6 @@ export function AppSidebar() {
     },
   ];
 
-  // Function to handle menu item clicks
-  const handleMenuItemClick = () => {
-    if (isMobile) {
-      setOpenMobile(false);
-    } else {
-      setOpen(false);
-    }
-  };
-
   return (
     <Sidebar variant="floating" collapsible="offcanvas" ref={sidebarRef}>
       <SidebarHeader className="p-4 flex justify-between items-center">
@@ -119,11 +91,7 @@ export function AppSidebar() {
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <Link 
-                      to={item.url} 
-                      className="flex items-center gap-2"
-                      onClick={handleMenuItemClick}
-                    >
+                    <Link to={item.url} className="flex items-center gap-2">
                       <item.icon className="h-5 w-5" />
                       <span>{item.title}</span>
                     </Link>
