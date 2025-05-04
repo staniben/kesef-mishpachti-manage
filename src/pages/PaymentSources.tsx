@@ -41,33 +41,51 @@ export default function PaymentSources() {
 
   // Set up real-time subscription to payment_sources table
   useEffect(() => {
-    const { data: authData } = supabase.auth.getSession();
-    
-    if (!authData.session?.user) {
-      return; // No need to subscribe if user is not authenticated
-    }
-    
-    // Subscribe to changes on the payment_sources table
-    const channel = supabase
-      .channel('payment_sources_channel')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'payment_sources',
-          filter: `user_id=eq.${authData.session.user.id}`,
-        },
-        () => {
-          // Refresh data when changes occur
-          fetchPaymentSources();
+    // Create an async function to get the session
+    const setupRealtimeSubscription = async () => {
+      try {
+        // Properly await and destructure the session data
+        const { data: sessionData, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error("Error getting session:", error);
+          return;
         }
-      )
-      .subscribe();
+        
+        // Only subscribe if we have a valid session and user
+        if (!sessionData?.session?.user) {
+          return; // No need to subscribe if user is not authenticated
+        }
+        
+        // Subscribe to changes on the payment_sources table
+        const channel = supabase
+          .channel('payment_sources_channel')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'payment_sources',
+              filter: `user_id=eq.${sessionData.session.user.id}`,
+            },
+            () => {
+              // Refresh data when changes occur
+              fetchPaymentSources();
+            }
+          )
+          .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
+        return () => {
+          supabase.removeChannel(channel);
+        };
+      } catch (err) {
+        console.error("Error setting up realtime subscription:", err);
+      }
     };
+    
+    // Call the async function
+    setupRealtimeSubscription();
+    
   }, [fetchPaymentSources]);
 
   const handleAddSource = async (source: PaymentSource) => {
