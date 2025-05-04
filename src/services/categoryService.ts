@@ -2,8 +2,12 @@
 import { ExpenseCategory } from '@/types/models';
 import { supabase } from '@/integrations/supabase/client';
 import { generateId } from './mockData';
+import { handleSupabaseError } from '@/utils/errorHandler';
+import { User } from '@supabase/supabase-js';
 
-// Map DB schema to frontend model
+/**
+ * Maps database category object to frontend model
+ */
 const mapDbCategoryToModel = (dbCategory: any): ExpenseCategory => ({
   id: dbCategory.id,
   name: dbCategory.name,
@@ -12,7 +16,9 @@ const mapDbCategoryToModel = (dbCategory: any): ExpenseCategory => ({
   updatedAt: dbCategory.updated_at
 });
 
-// Map frontend model to DB schema
+/**
+ * Maps frontend category model to database schema
+ */
 const mapModelToDbCategory = (category: ExpenseCategory) => ({
   id: category.id,
   name: category.name,
@@ -22,8 +28,11 @@ const mapModelToDbCategory = (category: ExpenseCategory) => ({
   user_id: null // Will be set in each method with the authenticated user's ID
 });
 
-// Helper function to verify authentication
-const verifyAuth = async () => {
+/**
+ * Verifies authentication and returns the current user
+ * @returns Authenticated user or throws an error if not authenticated
+ */
+const verifyAuth = async (): Promise<User> => {
   const { data: session, error: sessionError } = await supabase.auth.getSession();
   
   if (sessionError) {
@@ -47,24 +56,11 @@ const verifyAuth = async () => {
   return session.session.user;
 };
 
-// Add a function to debug a simplified error message
-const logSupabaseError = (action: string, error: any) => {
-  console.error(`Error ${action}:`, error);
-  console.error('Error code:', error.code);
-  console.error('Error message:', error.message);
-  console.error('Error details:', error.details);
-  
-  // Add special handling for common RLS and foreign key errors
-  if (error.code === '42501') {
-    console.error('🔒 RLS ERROR: This appears to be a permissions error. Check that RLS policies are correctly set up.');
-  } else if (error.code === '23503') {
-    console.error('🔑 FOREIGN KEY ERROR: This appears to be a foreign key constraint violation.');
-  } else if (error.code === '23505') {
-    console.error('🔢 UNIQUE VIOLATION: A unique constraint was violated (duplicate key).');
-  }
-};
-
 export const categoryService = {
+  /**
+   * Gets all categories for the authenticated user
+   * @returns Array of category objects
+   */
   getAll: async (): Promise<ExpenseCategory[]> => {
     try {
       const user = await verifyAuth();
@@ -90,7 +86,7 @@ export const categoryService = {
         .eq('user_id', user.id);
 
       if (error) {
-        logSupabaseError('fetching categories', error);
+        handleSupabaseError(error, 'fetching categories');
         throw error;
       }
 
@@ -102,6 +98,11 @@ export const categoryService = {
     }
   },
 
+  /**
+   * Gets a single category by ID
+   * @param id Category ID
+   * @returns Category object or null if not found
+   */
   getById: async (id: string): Promise<ExpenseCategory | null> => {
     try {
       const user = await verifyAuth();
@@ -114,7 +115,7 @@ export const categoryService = {
         .single();
 
       if (error) {
-        logSupabaseError(`fetching category with ID ${id}`, error);
+        handleSupabaseError(error, `fetching category with ID ${id}`);
         throw error;
       }
 
@@ -125,6 +126,11 @@ export const categoryService = {
     }
   },
 
+  /**
+   * Creates a new category
+   * @param category Category object to create
+   * @returns Created category
+   */
   create: async (category: ExpenseCategory): Promise<ExpenseCategory> => {
     try {
       const user = await verifyAuth();
@@ -161,24 +167,7 @@ export const categoryService = {
         .single();
 
       if (error) {
-        logSupabaseError('creating category', error);
-        
-        // Check specifically for RLS violations
-        if (error.code === '42501') {
-          // Try a simplified insert to diagnose the issue
-          const { error: testError } = await supabase
-            .from('categories')
-            .insert({ name: 'Test Category', user_id: user.id })
-            .select('id')
-            .single();
-            
-          if (testError) {
-            console.error('Even simplified category insertion fails:', testError);
-          } else {
-            console.log('Simplified category insertion worked! The issue might be with the payload format.');
-          }
-        }
-        
+        handleSupabaseError(error, 'creating category');
         throw error;
       }
 
@@ -194,6 +183,12 @@ export const categoryService = {
     }
   },
 
+  /**
+   * Updates an existing category
+   * @param id Category ID to update
+   * @param categoryData Partial category data to update
+   * @returns Updated category
+   */
   update: async (id: string, categoryData: Partial<ExpenseCategory>): Promise<ExpenseCategory> => {
     try {
       const user = await verifyAuth();
@@ -217,10 +212,7 @@ export const categoryService = {
         .single();
 
       if (error) {
-        console.error(`Error updating category with ID ${id}:`, error);
-        console.error('Error code:', error.code);
-        console.error('Error message:', error.message);
-        console.error('Error details:', error.details);
+        handleSupabaseError(error, `updating category with ID ${id}`);
         throw error;
       }
 
@@ -236,6 +228,10 @@ export const categoryService = {
     }
   },
 
+  /**
+   * Deletes a category and all associated expenses
+   * @param id Category ID to delete
+   */
   delete: async (id: string): Promise<void> => {
     try {
       const user = await verifyAuth();
@@ -249,7 +245,7 @@ export const categoryService = {
         .eq('user_id', user.id);
 
       if (expensesError) {
-        console.error(`Error deleting expenses for category ${id}:`, expensesError);
+        handleSupabaseError(expensesError, `deleting expenses for category ${id}`);
         throw expensesError;
       }
       
@@ -261,10 +257,7 @@ export const categoryService = {
         .eq('user_id', user.id);
 
       if (error) {
-        console.error(`Error deleting category with ID ${id}:`, error);
-        console.error('Error code:', error.code);
-        console.error('Error message:', error.message);
-        console.error('Error details:', error.details);
+        handleSupabaseError(error, `deleting category with ID ${id}`);
         throw error;
       }
       
