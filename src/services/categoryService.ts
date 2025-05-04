@@ -13,20 +13,28 @@ const mapDbCategoryToModel = (dbCategory: any): ExpenseCategory => ({
 });
 
 // Map frontend model to DB schema
-const mapModelToDbCategory = (category: ExpenseCategory, userId?: string) => ({
+const mapModelToDbCategory = (category: ExpenseCategory) => ({
   id: category.id,
   name: category.name,
   color: category.color,
   created_at: category.createdAt,
   updated_at: category.updatedAt,
-  user_id: userId
+  user_id: null // Will be set in each method with the authenticated user's ID
 });
 
 export const categoryService = {
   getAll: async (): Promise<ExpenseCategory[]> => {
+    const { data: userData } = await supabase.auth.getUser();
+    
+    if (!userData?.user) {
+      console.error('User not authenticated');
+      return [];
+    }
+    
     const { data, error } = await supabase
       .from('categories')
-      .select('*');
+      .select('*')
+      .eq('user_id', userData.user.id);
 
     if (error) {
       console.error('Error fetching categories:', error);
@@ -37,10 +45,18 @@ export const categoryService = {
   },
 
   getById: async (id: string): Promise<ExpenseCategory | null> => {
+    const { data: userData } = await supabase.auth.getUser();
+    
+    if (!userData?.user) {
+      console.error('User not authenticated');
+      return null;
+    }
+    
     const { data, error } = await supabase
       .from('categories')
       .select('*')
       .eq('id', id)
+      .eq('user_id', userData.user.id)
       .single();
 
     if (error) {
@@ -58,13 +74,13 @@ export const categoryService = {
       throw new Error('User not authenticated');
     }
     
-    const dbCategory = mapModelToDbCategory(
-      {
-        ...category,
-        id: category.id || generateId(),
-      },
-      userData.user.id
-    );
+    const dbCategory = mapModelToDbCategory({
+      ...category,
+      id: category.id || generateId(),
+    });
+    
+    // Set the user_id from authenticated session
+    dbCategory.user_id = userData.user.id;
     
     const { data, error } = await supabase
       .from('categories')
@@ -81,6 +97,12 @@ export const categoryService = {
   },
 
   update: async (id: string, categoryData: Partial<ExpenseCategory>): Promise<ExpenseCategory> => {
+    const { data: userData } = await supabase.auth.getUser();
+    
+    if (!userData?.user) {
+      throw new Error('User not authenticated');
+    }
+    
     // Map the partial update data to DB format
     const dbCategoryUpdate: Record<string, any> = {};
     
@@ -91,6 +113,7 @@ export const categoryService = {
       .from('categories')
       .update(dbCategoryUpdate)
       .eq('id', id)
+      .eq('user_id', userData.user.id)
       .select()
       .single();
 
@@ -103,17 +126,25 @@ export const categoryService = {
   },
 
   delete: async (id: string): Promise<void> => {
+    const { data: userData } = await supabase.auth.getUser();
+    
+    if (!userData?.user) {
+      throw new Error('User not authenticated');
+    }
+    
     // First delete all expenses with this category
     await supabase
       .from('expenses')
       .delete()
-      .eq('category_id', id);
+      .eq('category_id', id)
+      .eq('user_id', userData.user.id);
     
     // Then delete the category
     const { error } = await supabase
       .from('categories')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', userData.user.id);
 
     if (error) {
       console.error(`Error deleting category with ID ${id}:`, error);

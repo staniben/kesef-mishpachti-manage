@@ -25,7 +25,7 @@ const mapDbExpenseToModel = (dbExpense: any): Expense => ({
 });
 
 // Helper function to map frontend model to Supabase DB schema
-const mapModelToDbExpense = (expense: Expense, userId?: string) => ({
+const mapModelToDbExpense = (expense: Expense) => ({
   id: expense.id,
   title: expense.name, // Frontend uses 'name', DB uses 'title'
   amount: expense.amount,
@@ -43,14 +43,22 @@ const mapModelToDbExpense = (expense: Expense, userId?: string) => ({
   recurrence_id: expense.recurrenceId,
   created_at: expense.createdAt,
   updated_at: expense.updatedAt,
-  user_id: userId
+  user_id: null // Will be set in each method with the authenticated user's ID
 });
 
 export const expenseService = {
   getAll: async (): Promise<Expense[]> => {
+    const { data: userData } = await supabase.auth.getUser();
+    
+    if (!userData?.user) {
+      console.error('User not authenticated');
+      return [];
+    }
+    
     const { data, error } = await supabase
       .from('expenses')
-      .select('*');
+      .select('*')
+      .eq('user_id', userData.user.id);
 
     if (error) {
       console.error('Error fetching expenses:', error);
@@ -61,10 +69,18 @@ export const expenseService = {
   },
 
   getById: async (id: string): Promise<Expense | null> => {
+    const { data: userData } = await supabase.auth.getUser();
+    
+    if (!userData?.user) {
+      console.error('User not authenticated');
+      return null;
+    }
+    
     const { data, error } = await supabase
       .from('expenses')
       .select('*')
       .eq('id', id)
+      .eq('user_id', userData.user.id)
       .single();
 
     if (error) {
@@ -76,6 +92,13 @@ export const expenseService = {
   },
 
   getByMonth: async (month: number, year: number): Promise<Expense[]> => {
+    const { data: userData } = await supabase.auth.getUser();
+    
+    if (!userData?.user) {
+      console.error('User not authenticated');
+      return [];
+    }
+    
     // Convert month/year to start and end dates for querying
     const startDate = new Date(year, month, 1);
     const endDate = new Date(year, month + 1, 0);
@@ -83,6 +106,7 @@ export const expenseService = {
     const { data, error } = await supabase
       .from('expenses')
       .select('*')
+      .eq('user_id', userData.user.id)
       .gte('date', startDate.toISOString())
       .lt('date', endDate.toISOString());
 
@@ -95,9 +119,17 @@ export const expenseService = {
   },
   
   getByCategory: async (categoryId: string): Promise<Expense[]> => {
+    const { data: userData } = await supabase.auth.getUser();
+    
+    if (!userData?.user) {
+      console.error('User not authenticated');
+      return [];
+    }
+    
     const { data, error } = await supabase
       .from('expenses')
       .select('*')
+      .eq('user_id', userData.user.id)
       .eq('category_id', categoryId);
 
     if (error) {
@@ -109,9 +141,17 @@ export const expenseService = {
   },
   
   getByPaymentSource: async (sourceId: string): Promise<Expense[]> => {
+    const { data: userData } = await supabase.auth.getUser();
+    
+    if (!userData?.user) {
+      console.error('User not authenticated');
+      return [];
+    }
+    
     const { data, error } = await supabase
       .from('expenses')
       .select('*')
+      .eq('user_id', userData.user.id)
       .eq('payment_source_id', sourceId);
 
     if (error) {
@@ -133,9 +173,11 @@ export const expenseService = {
       {
         ...expense,
         id: expense.id || generateId(),
-      },
-      userData.user.id
+      }
     );
+    
+    // Set the user_id from authenticated session
+    dbExpense.user_id = userData.user.id;
     
     const { data, error } = await supabase
       .from('expenses')
@@ -158,13 +200,16 @@ export const expenseService = {
       throw new Error('User not authenticated');
     }
     
-    const dbExpenses = newExpenses.map(expense => mapModelToDbExpense(
-      {
+    const dbExpenses = newExpenses.map(expense => {
+      const dbExpense = mapModelToDbExpense({
         ...expense,
         id: expense.id || generateId(),
-      },
-      userData.user?.id
-    ));
+      });
+      
+      // Set the user_id from authenticated session
+      dbExpense.user_id = userData.user.id;
+      return dbExpense;
+    });
     
     const { data, error } = await supabase
       .from('expenses')
@@ -186,17 +231,6 @@ export const expenseService = {
       throw new Error('User not authenticated');
     }
     
-    // First get the existing expense to merge with updates
-    const { data: existingExpense } = await supabase
-      .from('expenses')
-      .select('*')
-      .eq('id', id)
-      .single();
-    
-    if (!existingExpense) {
-      throw new Error(`Expense with ID ${id} not found`);
-    }
-    
     // Map the partial update data to DB format
     const dbExpenseUpdate: Record<string, any> = {};
     
@@ -212,6 +246,7 @@ export const expenseService = {
       .from('expenses')
       .update(dbExpenseUpdate)
       .eq('id', id)
+      .eq('user_id', userData.user.id) // Ensure user can only update their own expenses
       .select()
       .single();
 
@@ -224,37 +259,20 @@ export const expenseService = {
   },
 
   delete: async (id: string): Promise<void> => {
+    const { data: userData } = await supabase.auth.getUser();
+    
+    if (!userData?.user) {
+      throw new Error('User not authenticated');
+    }
+    
     const { error } = await supabase
       .from('expenses')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', userData.user.id); // Ensure user can only delete their own expenses
 
     if (error) {
       console.error(`Error deleting expense with ID ${id}:`, error);
-      throw error;
-    }
-  },
-  
-  deleteByCategory: async (categoryId: string): Promise<void> => {
-    const { error } = await supabase
-      .from('expenses')
-      .delete()
-      .eq('category_id', categoryId);
-
-    if (error) {
-      console.error(`Error deleting expenses for category ${categoryId}:`, error);
-      throw error;
-    }
-  },
-  
-  deleteByPaymentSource: async (sourceId: string): Promise<void> => {
-    const { error } = await supabase
-      .from('expenses')
-      .delete()
-      .eq('payment_source_id', sourceId);
-
-    if (error) {
-      console.error(`Error deleting expenses for payment source ${sourceId}:`, error);
       throw error;
     }
   }

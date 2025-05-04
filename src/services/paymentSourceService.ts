@@ -14,21 +14,29 @@ const mapDbSourceToModel = (dbSource: any): PaymentSource => ({
 });
 
 // Map frontend model to DB schema
-const mapModelToDbSource = (source: PaymentSource, userId?: string) => ({
+const mapModelToDbSource = (source: PaymentSource) => ({
   id: source.id,
   name: source.name,
   type: source.type,
   color: source.color,
   created_at: source.createdAt,
   updated_at: source.updatedAt,
-  user_id: userId
+  user_id: null // Will be set in each method with the authenticated user's ID
 });
 
 export const paymentSourceService = {
   getAll: async (): Promise<PaymentSource[]> => {
+    const { data: userData } = await supabase.auth.getUser();
+    
+    if (!userData?.user) {
+      console.error('User not authenticated');
+      return [];
+    }
+    
     const { data, error } = await supabase
       .from('payment_sources')
-      .select('*');
+      .select('*')
+      .eq('user_id', userData.user.id);
 
     if (error) {
       console.error('Error fetching payment sources:', error);
@@ -39,10 +47,18 @@ export const paymentSourceService = {
   },
 
   getById: async (id: string): Promise<PaymentSource | null> => {
+    const { data: userData } = await supabase.auth.getUser();
+    
+    if (!userData?.user) {
+      console.error('User not authenticated');
+      return null;
+    }
+    
     const { data, error } = await supabase
       .from('payment_sources')
       .select('*')
       .eq('id', id)
+      .eq('user_id', userData.user.id)
       .single();
 
     if (error) {
@@ -60,13 +76,13 @@ export const paymentSourceService = {
       throw new Error('User not authenticated');
     }
     
-    const dbSource = mapModelToDbSource(
-      {
-        ...source,
-        id: source.id || generateId(),
-      },
-      userData.user.id
-    );
+    const dbSource = mapModelToDbSource({
+      ...source,
+      id: source.id || generateId(),
+    });
+    
+    // Set the user_id from authenticated session
+    dbSource.user_id = userData.user.id;
     
     const { data, error } = await supabase
       .from('payment_sources')
@@ -83,6 +99,12 @@ export const paymentSourceService = {
   },
 
   update: async (id: string, sourceData: Partial<PaymentSource>): Promise<PaymentSource> => {
+    const { data: userData } = await supabase.auth.getUser();
+    
+    if (!userData?.user) {
+      throw new Error('User not authenticated');
+    }
+    
     // Map the partial update data to DB format
     const dbSourceUpdate: Record<string, any> = {};
     
@@ -94,6 +116,7 @@ export const paymentSourceService = {
       .from('payment_sources')
       .update(dbSourceUpdate)
       .eq('id', id)
+      .eq('user_id', userData.user.id)
       .select()
       .single();
 
@@ -106,10 +129,17 @@ export const paymentSourceService = {
   },
 
   delete: async (id: string): Promise<void> => {
+    const { data: userData } = await supabase.auth.getUser();
+    
+    if (!userData?.user) {
+      throw new Error('User not authenticated');
+    }
+    
     // First check how many payment sources the user has
     const { count, error: countError } = await supabase
       .from('payment_sources')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userData.user.id);
     
     if (countError) {
       console.error('Error counting payment sources:', countError);
@@ -121,11 +151,19 @@ export const paymentSourceService = {
       throw new Error('Cannot delete the last payment source');
     }
     
+    // Delete all expenses with this payment source
+    await supabase
+      .from('expenses')
+      .delete()
+      .eq('payment_source_id', id)
+      .eq('user_id', userData.user.id);
+    
     // Delete the payment source
     const { error } = await supabase
       .from('payment_sources')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', userData.user.id);
 
     if (error) {
       console.error(`Error deleting payment source with ID ${id}:`, error);
