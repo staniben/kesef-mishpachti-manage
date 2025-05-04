@@ -100,9 +100,18 @@ export default function PaymentSources() {
       });
     } catch (error) {
       console.error("Error adding payment source:", error);
+      // Enhanced error reporting
+      let errorMessage = "אירעה שגיאה בהוספת אמצעי התשלום";
+      if (error instanceof Error) {
+        console.error("Error details:", error.message);
+        // Optionally include specific error message for developers or in dev mode
+        if (process.env.NODE_ENV === 'development') {
+          errorMessage = `שגיאה: ${error.message}`;
+        }
+      }
       toast({
         title: "שגיאה",
-        description: error instanceof Error ? error.message : "אירעה שגיאה בהוספת אמצעי התשלום",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -123,9 +132,18 @@ export default function PaymentSources() {
       });
     } catch (error) {
       console.error("Error updating payment source:", error);
+      // Enhanced error reporting
+      let errorMessage = "אירעה שגיאה בעדכון אמצעי התשלום";
+      if (error instanceof Error) {
+        console.error("Error details:", error.message);
+        // Optionally include specific error message for developers or in dev mode
+        if (process.env.NODE_ENV === 'development') {
+          errorMessage = `שגיאה: ${error.message}`;
+        }
+      }
       toast({
         title: "שגיאה",
-        description: error instanceof Error ? error.message : "אירעה שגיאה בעדכון אמצעי התשלום",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

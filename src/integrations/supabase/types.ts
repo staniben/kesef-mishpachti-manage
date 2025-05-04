@@ -92,6 +92,7 @@ export type Database = {
       }
       payment_sources: {
         Row: {
+          color: string | null
           created_at: string
           id: string
           name: string
@@ -100,6 +101,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          color?: string | null
           created_at?: string
           id?: string
           name: string
@@ -108,6 +110,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          color?: string | null
           created_at?: string
           id?: string
           name?: string

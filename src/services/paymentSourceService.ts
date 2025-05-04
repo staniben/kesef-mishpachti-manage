@@ -98,6 +98,8 @@ export const paymentSourceService = {
 
     if (error) {
       console.error('Error creating payment source:', error);
+      console.error('Supabase insert error message:', error.message);
+      console.error('Supabase error details:', error.details);
       throw error;
     }
 
@@ -132,6 +134,8 @@ export const paymentSourceService = {
 
     if (error) {
       console.error(`Error updating payment source with ID ${id}:`, error);
+      console.error('Supabase update error message:', error.message);
+      console.error('Supabase error details:', error.details);
       throw error;
     }
 
