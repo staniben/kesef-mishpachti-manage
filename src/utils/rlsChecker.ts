@@ -16,47 +16,66 @@ interface RlsTestResult {
 }
 
 /**
- * Creates a valid test record for a specific table
+ * Creates a table-specific test record for each table type
  */
-const createTestRecord = (table: TableName, userId: string): Partial<DbCategory | DbExpense | DbPaymentSource> => {
+const createCategoryTestRecord = (userId: string): Omit<DbCategory, 'id'> => {
   const testId = uuidv4();
   const now = new Date().toISOString();
   
-  // Base properties for all tables
-  const baseRecord = {
-    id: testId,
+  return {
+    name: `Test Category ${testId.substring(0, 8)}`,
+    color: '#ff0000',
     user_id: userId,
     created_at: now,
-    updated_at: now,
+    updated_at: now
   };
+};
+
+const createExpenseTestRecord = (userId: string): Omit<DbExpense, 'id'> => {
+  const testId = uuidv4();
+  const now = new Date().toISOString();
   
+  return {
+    title: `Test Expense ${testId.substring(0, 8)}`,
+    amount: 100,
+    date: now,
+    payment_type: 'one-time',
+    user_id: userId,
+    created_at: now,
+    updated_at: now
+  };
+};
+
+const createPaymentSourceTestRecord = (userId: string): Omit<DbPaymentSource, 'id'> => {
+  const testId = uuidv4();
+  const now = new Date().toISOString();
+  
+  return {
+    name: `Test Source ${testId.substring(0, 8)}`,
+    type: 'cash', 
+    color: '#00ff00',
+    user_id: userId,
+    created_at: now,
+    updated_at: now
+  };
+};
+
+/**
+ * Creates a valid test record for a specific table
+ */
+const createTestRecord = (table: TableName, userId: string) => {
   // Add table-specific required properties
   switch(table) {
     case 'categories':
-      return {
-        ...baseRecord,
-        name: `Test Category ${testId.substring(0, 8)}`,
-        color: '#ff0000',
-      } as Partial<DbCategory>;
+      return createCategoryTestRecord(userId);
       
     case 'expenses':
-      return {
-        ...baseRecord,
-        title: `Test Expense ${testId.substring(0, 8)}`,
-        amount: 100,
-        date: now,
-        payment_type: 'one-time',
-      } as Partial<DbExpense>;
+      return createExpenseTestRecord(userId);
       
     case 'payment_sources':
-      return {
-        ...baseRecord,
-        name: `Test Source ${testId.substring(0, 8)}`,
-        type: 'cash', 
-        color: '#00ff00',
-      } as Partial<DbPaymentSource>;
+      return createPaymentSourceTestRecord(userId);
   }
-}
+};
 
 /**
  * Tests RLS policies for a specific table and operation
@@ -102,7 +121,7 @@ export const testRlsPolicy = async (
           await supabase
             .from(table)
             .delete()
-            .eq('id', testData.id);
+            .eq('id', result.data.id);
         }
         break;
         

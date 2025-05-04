@@ -3,6 +3,4 @@ export * from './models';
 export * from './actions';
 export * from './supabase';
 
-// Utility types
-export type ThemeType = 'default' | 'purple' | 'blue' | 'green';
-
+// ThemeType is now exported from models.ts so we don't need to redefine it here
