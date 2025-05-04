@@ -10,6 +10,7 @@ interface AuthContextType {
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   isLoading: boolean;
+  isAuthenticated: boolean; // Added to easily check authentication status
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -19,12 +20,14 @@ const AuthContext = createContext<AuthContextType>({
   signUp: async () => {},
   signOut: async () => {},
   isLoading: true,
+  isAuthenticated: false,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
     console.log("Setting up auth state listener");
@@ -35,13 +38,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log("Auth state changed:", event);
         setSession(newSession);
         setUser(newSession?.user || null);
+        setIsAuthenticated(!!newSession?.user);
         setIsLoading(false);
         
         if (newSession?.user) {
           console.log("User authenticated:", newSession.user.id);
           console.log("Access token present:", !!newSession.access_token);
+          console.log("Access token expires at:", new Date(newSession.expires_at * 1000).toISOString());
+          
+          // Let's check if the token will expire soon (within 10 minutes)
+          const expiresInMs = (newSession.expires_at * 1000) - Date.now();
+          const expiresInMinutes = Math.floor(expiresInMs / (1000 * 60));
+          console.log(`Token expires in ${expiresInMinutes} minutes`);
+          
+          if (expiresInMinutes < 10) {
+            console.warn("⚠️ Auth token expires soon! This might cause issues with requests.");
+          }
         } else {
           console.log("No authenticated user");
+          setIsAuthenticated(false);
         }
       }
     );
@@ -51,10 +66,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log("Initial session check:", initialSession ? "Session found" : "No session");
       setSession(initialSession);
       setUser(initialSession?.user || null);
+      setIsAuthenticated(!!initialSession?.user);
       setIsLoading(false);
       
       if (initialSession?.user) {
         console.log("User authenticated:", initialSession.user.id);
+        console.log("Initial access token present:", !!initialSession.access_token);
+        
+        // Let's verify if the token still has reasonable validity
+        const expiresInMs = (initialSession.expires_at * 1000) - Date.now();
+        const expiresInMinutes = Math.floor(expiresInMs / (1000 * 60));
+        console.log(`Token expires in ${expiresInMinutes} minutes`);
+        
+        if (expiresInMinutes < 10) {
+          console.warn("⚠️ Auth token expires soon! This might cause issues with requests.");
+        }
+        
+        // Optional: Test a simple authenticated query to verify token works
+        supabase.from('categories')
+          .select('count(*)', { count: 'exact', head: true })
+          .then(({ count, error }) => {
+            if (error) {
+              console.error("Auth test query failed:", error);
+              if (error.message.includes("JWT") || error.message.includes("auth")) {
+                console.error("⚠️ Authentication appears invalid despite session!");
+                // Don't reset auth state here - that would cause a loop
+              }
+            } else {
+              console.log("Auth test query succeeded, user can access data");
+            }
+          });
       }
     });
 
@@ -99,6 +140,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log("Sign in successful, session established:", !!data.session);
       console.log("User ID:", data.user?.id);
       console.log("Access token present:", !!data.session?.access_token);
+      
+      // Test if the auth state changed listener fired correctly
+      setTimeout(() => {
+        if (!isAuthenticated) {
+          console.warn("⚠️ Auth state might not be updating correctly after sign in");
+        } else {
+          console.log("Auth state updated correctly after sign in");
+        }
+      }, 500);
       
     } catch (error) {
       console.error("Sign in error:", error);
@@ -146,6 +196,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signUp,
     signOut,
     isLoading,
+    isAuthenticated,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

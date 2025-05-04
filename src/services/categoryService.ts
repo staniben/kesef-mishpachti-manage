@@ -36,7 +36,32 @@ const verifyAuth = async () => {
     throw new Error('User not authenticated');
   }
   
+  // Verify token expiration
+  const expiresInMs = (session.session.expires_at * 1000) - Date.now();
+  const expiresInMinutes = Math.floor(expiresInMs / (1000 * 60));
+  
+  if (expiresInMinutes < 10) {
+    console.warn(`⚠️ Auth token expires in ${expiresInMinutes} minutes!`);
+  }
+  
   return session.session.user;
+};
+
+// Add a function to debug a simplified error message
+const logSupabaseError = (action: string, error: any) => {
+  console.error(`Error ${action}:`, error);
+  console.error('Error code:', error.code);
+  console.error('Error message:', error.message);
+  console.error('Error details:', error.details);
+  
+  // Add special handling for common RLS and foreign key errors
+  if (error.code === '42501') {
+    console.error('🔒 RLS ERROR: This appears to be a permissions error. Check that RLS policies are correctly set up.');
+  } else if (error.code === '23503') {
+    console.error('🔑 FOREIGN KEY ERROR: This appears to be a foreign key constraint violation.');
+  } else if (error.code === '23505') {
+    console.error('🔢 UNIQUE VIOLATION: A unique constraint was violated (duplicate key).');
+  }
 };
 
 export const categoryService = {
@@ -45,16 +70,27 @@ export const categoryService = {
       const user = await verifyAuth();
       console.log('Fetching categories for user:', user.id);
       
+      // Test first with count to see if RLS allows access
+      const { count, error: countError } = await supabase
+        .from('categories')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+        
+      if (countError) {
+        console.error('Error checking categories count:', countError);
+        console.error('RLS might be preventing access to categories');
+        throw countError;
+      }
+      
+      console.log(`Found ${count || 0} categories with RLS rules`);
+      
       const { data, error } = await supabase
         .from('categories')
         .select('*')
         .eq('user_id', user.id);
 
       if (error) {
-        console.error('Error fetching categories:', error);
-        console.error('Error code:', error.code);
-        console.error('Error message:', error.message);
-        console.error('Error details:', error.details);
+        logSupabaseError('fetching categories', error);
         throw error;
       }
 
@@ -78,7 +114,7 @@ export const categoryService = {
         .single();
 
       if (error) {
-        console.error(`Error fetching category with ID ${id}:`, error);
+        logSupabaseError(`fetching category with ID ${id}`, error);
         throw error;
       }
 
@@ -106,6 +142,18 @@ export const categoryService = {
       
       console.log('Sending category payload to Supabase:', dbCategory);
       
+      // First test if we can access the table with a simple count
+      const { count, error: countError } = await supabase
+        .from('categories')
+        .select('*', { count: 'exact', head: true });
+        
+      if (countError) {
+        console.error('Cannot access categories table:', countError);
+        console.error('RLS might be preventing access to the categories table');
+      } else {
+        console.log(`User can access categories table, found ${count} existing categories`);
+      }
+      
       const { data, error } = await supabase
         .from('categories')
         .insert(dbCategory)
@@ -113,10 +161,24 @@ export const categoryService = {
         .single();
 
       if (error) {
-        console.error('Error creating category:', error);
-        console.error('Error code:', error.code);
-        console.error('Error message:', error.message);
-        console.error('Error details:', error.details);
+        logSupabaseError('creating category', error);
+        
+        // Check specifically for RLS violations
+        if (error.code === '42501') {
+          // Try a simplified insert to diagnose the issue
+          const { error: testError } = await supabase
+            .from('categories')
+            .insert({ name: 'Test Category', user_id: user.id })
+            .select('id')
+            .single();
+            
+          if (testError) {
+            console.error('Even simplified category insertion fails:', testError);
+          } else {
+            console.log('Simplified category insertion worked! The issue might be with the payload format.');
+          }
+        }
+        
         throw error;
       }
 
