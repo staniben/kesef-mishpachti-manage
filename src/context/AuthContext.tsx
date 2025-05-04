@@ -27,23 +27,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    console.log("Setting up auth state listener");
+    
     // Set up the auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user || null);
+      (event, newSession) => {
+        console.log("Auth state changed:", event);
+        setSession(newSession);
+        setUser(newSession?.user || null);
         setIsLoading(false);
+        
+        if (newSession?.user) {
+          console.log("User authenticated:", newSession.user.id);
+          console.log("Access token present:", !!newSession.access_token);
+        } else {
+          console.log("No authenticated user");
+        }
       }
     );
 
     // Get the initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user || null);
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      console.log("Initial session check:", initialSession ? "Session found" : "No session");
+      setSession(initialSession);
+      setUser(initialSession?.user || null);
       setIsLoading(false);
+      
+      if (initialSession?.user) {
+        console.log("User authenticated:", initialSession.user.id);
+      }
     });
 
     return () => {
+      console.log("Cleaning up auth state listener");
       subscription.unsubscribe();
     };
   }, []);
@@ -81,6 +97,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       console.log("Sign in successful, session established:", !!data.session);
+      console.log("User ID:", data.user?.id);
+      console.log("Access token present:", !!data.session?.access_token);
       
     } catch (error) {
       console.error("Sign in error:", error);
