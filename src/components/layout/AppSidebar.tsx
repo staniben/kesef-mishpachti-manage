@@ -26,13 +26,20 @@ export function AppSidebar() {
 
   // Close sidebar when route changes
   useEffect(() => {
-    if (isMobile && openMobile) {
-      setOpenMobile(false);
-    }
-    // For desktop, only close when in offcanvas mode
-    else if (!isMobile && open) {
-      setOpen(false);
-    }
+    const handleRouteChange = () => {
+      if (isMobile && openMobile) {
+        setOpenMobile(false);
+      }
+      // For desktop, only close when in offcanvas mode
+      else if (!isMobile && open) {
+        setOpen(false);
+      }
+    };
+    
+    // Call the handler when the location changes
+    handleRouteChange();
+    
+    // No need for a cleanup function as we're not setting up any listeners here
   }, [location, isMobile, openMobile, setOpenMobile, open, setOpen]);
 
   // Handle clicks outside the sidebar to close it
