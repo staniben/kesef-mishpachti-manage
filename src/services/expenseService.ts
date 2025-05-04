@@ -24,27 +24,43 @@ const mapDbExpenseToModel = (dbExpense: any): Expense => ({
   updatedAt: dbExpense.updated_at
 });
 
+// Validate expense data before it's sent to the database
+const validateExpenseForDB = (expense: Expense): string | null => {
+  // Required fields validation
+  if (!expense.name) return "שם ההוצאה נדרש";
+  if (expense.amount === undefined || isNaN(Number(expense.amount))) return "סכום תקין נדרש";
+  if (!expense.date) return "תאריך נדרש";
+  if (!expense.paymentType) return "סוג תשלום נדרש";
+  
+  return null; // No validation errors
+};
+
 // Helper function to map frontend model to Supabase DB schema
-const mapModelToDbExpense = (expense: Expense) => ({
-  id: expense.id,
-  title: expense.name, // Frontend uses 'name', DB uses 'title'
-  amount: expense.amount,
-  date: expense.date,
-  time: expense.time,
-  category_id: expense.categoryId,
-  payment_source_id: expense.paymentSourceId,
-  payment_type: expense.paymentType,
-  related_expense_id: expense.relatedExpenseId,
-  installment: expense.isInstallment || false,
-  installment_count: expense.installmentNumber,
-  total_installments: expense.totalInstallments,
-  recurring: expense.isRecurring || false,
-  recurring_interval: expense.recurrenceType,
-  recurrence_id: expense.recurrenceId,
-  created_at: expense.createdAt,
-  updated_at: expense.updatedAt,
-  user_id: null // Will be set in each method with the authenticated user's ID
-});
+const mapModelToDbExpense = (expense: Expense) => {
+  // Create a database-compatible object
+  const dbExpense = {
+    id: expense.id,
+    title: expense.name, // Frontend uses 'name', DB uses 'title'
+    amount: Number(expense.amount), // Ensure it's a number
+    date: expense.date,
+    time: expense.time,
+    category_id: expense.categoryId,
+    payment_source_id: expense.paymentSourceId,
+    payment_type: expense.paymentType,
+    related_expense_id: expense.relatedExpenseId,
+    installment: expense.isInstallment || false,
+    installment_count: expense.installmentNumber,
+    total_installments: expense.totalInstallments,
+    recurring: expense.isRecurring || false,
+    recurring_interval: expense.recurrenceType,
+    recurrence_id: expense.recurrenceId,
+    created_at: expense.createdAt,
+    updated_at: expense.updatedAt,
+    user_id: null // Will be set in each method with the authenticated user's ID
+  };
+  
+  return dbExpense;
+};
 
 export const expenseService = {
   getAll: async (): Promise<Expense[]> => {
@@ -169,15 +185,22 @@ export const expenseService = {
       throw new Error('User not authenticated');
     }
     
-    const dbExpense = mapModelToDbExpense(
-      {
-        ...expense,
-        id: expense.id || generateId(),
-      }
-    );
+    // Validate the expense data
+    const validationError = validateExpenseForDB(expense);
+    if (validationError) {
+      throw new Error(validationError);
+    }
+    
+    const dbExpense = mapModelToDbExpense({
+      ...expense,
+      id: expense.id || generateId(),
+    });
     
     // Set the user_id from authenticated session
     dbExpense.user_id = userData.user.id;
+    
+    // Log what we're sending to Supabase for debugging
+    console.log('Creating expense with data:', dbExpense);
     
     const { data, error } = await supabase
       .from('expenses')
@@ -187,6 +210,8 @@ export const expenseService = {
 
     if (error) {
       console.error('Error creating expense:', error);
+      console.error('Supabase error message:', error.message);
+      console.error('Supabase error details:', error.details);
       throw error;
     }
 
@@ -200,6 +225,19 @@ export const expenseService = {
       throw new Error('User not authenticated');
     }
     
+    // Validate each expense in the batch
+    const validationErrors: string[] = [];
+    newExpenses.forEach((expense, index) => {
+      const error = validateExpenseForDB(expense);
+      if (error) {
+        validationErrors.push(`Expense #${index + 1}: ${error}`);
+      }
+    });
+    
+    if (validationErrors.length > 0) {
+      throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
+    }
+    
     const dbExpenses = newExpenses.map(expense => {
       const dbExpense = mapModelToDbExpense({
         ...expense,
@@ -211,6 +249,8 @@ export const expenseService = {
       return dbExpense;
     });
     
+    console.log('Creating batch expenses:', dbExpenses);
+    
     const { data, error } = await supabase
       .from('expenses')
       .insert(dbExpenses)
@@ -218,6 +258,8 @@ export const expenseService = {
 
     if (error) {
       console.error('Error creating batch expenses:', error);
+      console.error('Supabase error message:', error.message);
+      console.error('Supabase error details:', error.details);
       throw error;
     }
 
@@ -235,12 +277,21 @@ export const expenseService = {
     const dbExpenseUpdate: Record<string, any> = {};
     
     if (expenseData.name !== undefined) dbExpenseUpdate.title = expenseData.name;
-    if (expenseData.amount !== undefined) dbExpenseUpdate.amount = expenseData.amount;
+    if (expenseData.amount !== undefined) dbExpenseUpdate.amount = Number(expenseData.amount);
     if (expenseData.date !== undefined) dbExpenseUpdate.date = expenseData.date;
     if (expenseData.time !== undefined) dbExpenseUpdate.time = expenseData.time;
     if (expenseData.categoryId !== undefined) dbExpenseUpdate.category_id = expenseData.categoryId;
     if (expenseData.paymentSourceId !== undefined) dbExpenseUpdate.payment_source_id = expenseData.paymentSourceId;
     if (expenseData.paymentType !== undefined) dbExpenseUpdate.payment_type = expenseData.paymentType;
+    if (expenseData.isInstallment !== undefined) dbExpenseUpdate.installment = expenseData.isInstallment;
+    if (expenseData.installmentNumber !== undefined) dbExpenseUpdate.installment_count = expenseData.installmentNumber;
+    if (expenseData.totalInstallments !== undefined) dbExpenseUpdate.total_installments = expenseData.totalInstallments;
+    if (expenseData.isRecurring !== undefined) dbExpenseUpdate.recurring = expenseData.isRecurring;
+    if (expenseData.recurrenceType !== undefined) dbExpenseUpdate.recurring_interval = expenseData.recurrenceType;
+    if (expenseData.relatedExpenseId !== undefined) dbExpenseUpdate.related_expense_id = expenseData.relatedExpenseId;
+    if (expenseData.recurrenceId !== undefined) dbExpenseUpdate.recurrence_id = expenseData.recurrenceId;
+    
+    console.log(`Updating expense ${id} with data:`, dbExpenseUpdate);
     
     const { data, error } = await supabase
       .from('expenses')
@@ -252,6 +303,8 @@ export const expenseService = {
 
     if (error) {
       console.error(`Error updating expense with ID ${id}:`, error);
+      console.error('Supabase error message:', error.message);
+      console.error('Supabase error details:', error.details);
       throw error;
     }
 

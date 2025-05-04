@@ -1,4 +1,3 @@
-
 import { format, addMonths } from 'date-fns';
 import { Expense, PaymentType, RecurrenceType } from '@/types/models';
 import { v4 as uuidv4 } from 'uuid';
@@ -16,10 +15,13 @@ export const createBaseExpense = (
   paymentSourceId: string,
   paymentType: PaymentType
 ): Expense => {
+  // Format the date as ISO string (YYYY-MM-DD)
+  const formattedDate = format(date, "yyyy-MM-dd");
+  
   return {
     id: editId || uuidv4(),
     amount,
-    date: format(date, "yyyy-MM-dd"),
+    date: formattedDate,
     time,
     name,
     categoryId,
@@ -71,6 +73,7 @@ export const generateInstallmentExpenses = (
       totalInstallments: installments,
       isInstallment: true,
       relatedExpenseId: i > 0 ? installmentExpenses[0].id : undefined,
+      recurrenceId, // Add recurrenceId to group installments together
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -117,6 +120,8 @@ export const generateRecurringExpenses = (
       isRecurring: true,
       recurrenceId,
       recurrenceType,
+      totalInstallments: months, // Add total months as totalInstallments
+      installmentNumber: i + 1,  // Track which recurrence this is
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };

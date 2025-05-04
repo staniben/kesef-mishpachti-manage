@@ -140,9 +140,21 @@ export function useExpenseForm(editId?: string) {
       // Navigate back to the dashboard after adding/editing
       navigate("/");
     } catch (error) {
+      console.error("Error saving expense:", error);
+      
+      // Enhanced error handling
+      let errorMessage = "אירעה שגיאה בעת שמירת ההוצאה";
+      if (error instanceof Error) {
+        console.error("Error details:", error.message);
+        // Show more detailed error in development or for specific errors
+        if (process.env.NODE_ENV === 'development' || error.message.includes("נדרש")) {
+          errorMessage = error.message;
+        }
+      }
+      
       toast({
         title: "שגיאה",
-        description: error instanceof Error ? error.message : "אירעה שגיאה בעת שמירת ההוצאה",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
