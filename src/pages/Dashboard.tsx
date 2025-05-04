@@ -4,7 +4,7 @@ import { MonthSelector } from "@/components/MonthSelector";
 import { ExpenseChart } from "@/components/ExpenseChart";
 import { ExpensesList } from "@/components/ExpensesList";
 import { Button } from "@/components/ui/button";
-import { Plus, FileExcel, Download } from "lucide-react";
+import { Plus, FileDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAppStore } from "@/store";
@@ -80,7 +80,7 @@ export default function Dashboard() {
         <h1 className="text-3xl font-bold">דשבורד</h1>
         <div className="flex gap-2">
           <Button onClick={handleExportToExcel} variant="outline">
-            <FileExcel className="h-4 w-4 ml-2" />
+            <FileDown className="h-4 w-4 ml-2" />
             ייצוא לאקסל
           </Button>
           <Button onClick={handleAddExpense}>
