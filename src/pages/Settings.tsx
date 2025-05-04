@@ -1,14 +1,16 @@
 
-import { useAppContext } from "@/context/AppContext";
+import { useAppStore } from "@/store";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { ThemeType } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Settings() {
-  const { theme, setTheme } = useAppContext();
+  const { theme, setTheme } = useAppStore(state => ({
+    theme: state.theme,
+    setTheme: state.setTheme
+  }));
   const { toast } = useToast();
 
   const handleThemeChange = (value: ThemeType) => {
