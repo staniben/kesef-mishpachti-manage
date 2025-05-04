@@ -123,6 +123,7 @@ export function StoreInitializer() {
           errorMessage += " (ניסיון " + (initializationAttempts + 1) + ")";
         }
         
+        // Fix type error by using correct toast options format
         toast({
           title: "שגיאה בטעינת נתונים",
           description: errorMessage,
