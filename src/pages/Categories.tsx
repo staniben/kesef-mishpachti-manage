@@ -7,12 +7,12 @@ import { CategoryForm } from "@/components/CategoryForm";
 import { ExpenseCategory } from "@/types/models";
 import { Plus, Edit, Trash } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useAppStore } from "@/store";
+import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 
 export default function Categories() {
-  const { categories, addCategory, updateCategory, deleteCategory, fetchCategories } = useAppStore();
   const { toast } = useToast();
+  const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentCategory, setCurrentCategory] = useState<ExpenseCategory | undefined>();
@@ -20,61 +20,141 @@ export default function Categories() {
 
   // Fetch categories when component mounts
   useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        setIsLoading(true);
-        await fetchCategories();
-      } catch (error) {
+    fetchCategories();
+  }, []);
+
+  const fetchCategories = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Get the current user
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !authData.user) {
+        console.error("Authentication error:", authError);
+        toast({
+          title: "שגיאה",
+          description: "יש להתחבר מחדש למערכת",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+      
+      // Fetch categories for the current user
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('user_id', authData.user.id);
+
+      if (error) {
+        console.error("Error fetching categories:", error);
         toast({
           title: "שגיאה",
           description: "אירעה שגיאה בטעינת הקטגוריות",
           variant: "destructive",
         });
-        console.error("Error fetching categories:", error);
-      } finally {
-        setIsLoading(false);
+        return;
       }
-    };
 
-    loadCategories();
-  }, [fetchCategories, toast]);
+      // Map the database results to our model format
+      const mappedCategories = data.map((item: any): ExpenseCategory => ({
+        id: item.id,
+        name: item.name,
+        color: item.color || "#4CAF50",
+        user_id: item.user_id,
+        createdAt: item.created_at,
+        updatedAt: item.updated_at
+      }));
+      
+      setCategories(mappedCategories);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      toast({
+        title: "שגיאה",
+        description: "אירעה שגיאה בטעינת הקטגוריות",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleAddCategory = async (category: ExpenseCategory) => {
     try {
-      await addCategory(category);
+      // Prepare the category data for Supabase (snake_case)
+      const dbCategory = {
+        id: category.id,
+        name: category.name,
+        color: category.color,
+        user_id: category.user_id,
+        created_at: category.createdAt,
+        updated_at: category.updatedAt
+      };
+      
+      const { error } = await supabase
+        .from('categories')
+        .insert(dbCategory);
+
+      if (error) {
+        console.error("Error adding category:", error);
+        toast({
+          title: "שגיאה",
+          description: "אירעה שגיאה בהוספת הקטגוריה",
+          variant: "destructive",
+        });
+        throw error;
+      }
+      
       setIsAddDialogOpen(false);
+      await fetchCategories(); // Re-fetch categories
+      
       toast({
         title: "קטגוריה נוספה",
         description: "הקטגוריה נוספה בהצלחה",
       });
     } catch (error) {
-      toast({
-        title: "שגיאה",
-        description: "אירעה שגיאה בהוספת הקטגוריה",
-        variant: "destructive",
-      });
       console.error("Error adding category:", error);
-      throw error; // Rethrow to be caught by the form
+      throw error;
     }
   };
 
   const handleUpdateCategory = async (category: ExpenseCategory) => {
     try {
-      await updateCategory(category.id, category);
+      // Prepare the category data for Supabase (snake_case)
+      const dbCategory = {
+        name: category.name,
+        color: category.color,
+        updated_at: category.updatedAt
+      };
+      
+      const { error } = await supabase
+        .from('categories')
+        .update(dbCategory)
+        .eq('id', category.id)
+        .eq('user_id', category.user_id);
+
+      if (error) {
+        console.error("Error updating category:", error);
+        toast({
+          title: "שגיאה",
+          description: "אירעה שגיאה בעדכון הקטגוריה",
+          variant: "destructive",
+        });
+        throw error;
+      }
+      
       setIsEditDialogOpen(false);
       setCurrentCategory(undefined);
+      await fetchCategories(); // Re-fetch categories
+      
       toast({
         title: "קטגוריה עודכנה",
         description: "פרטי הקטגוריה עודכנו בהצלחה",
       });
     } catch (error) {
-      toast({
-        title: "שגיאה",
-        description: "אירעה שגיאה בעדכון הקטגוריה",
-        variant: "destructive",
-      });
       console.error("Error updating category:", error);
-      throw error; // Rethrow to be caught by the form
+      throw error;
     }
   };
 
@@ -86,17 +166,29 @@ export default function Categories() {
   const handleDeleteClick = async (category: ExpenseCategory) => {
     if (window.confirm(`האם אתה בטוח שברצונך למחוק את הקטגוריה "${category.name}"?`)) {
       try {
-        await deleteCategory(category.id);
+        const { error } = await supabase
+          .from('categories')
+          .delete()
+          .eq('id', category.id)
+          .eq('user_id', category.user_id);
+
+        if (error) {
+          console.error("Error deleting category:", error);
+          toast({
+            title: "שגיאה",
+            description: "אירעה שגיאה במחיקת הקטגוריה",
+            variant: "destructive",
+          });
+          throw error;
+        }
+        
+        await fetchCategories(); // Re-fetch categories
+        
         toast({
           title: "קטגוריה נמחקה",
           description: "הקטגוריה נמחקה בהצלחה",
         });
       } catch (error) {
-        toast({
-          title: "שגיאה",
-          description: error instanceof Error ? error.message : "אירעה שגיאה במחיקת הקטגוריה",
-          variant: "destructive",
-        });
         console.error("Error deleting category:", error);
       }
     }

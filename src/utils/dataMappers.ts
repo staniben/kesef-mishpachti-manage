@@ -14,6 +14,7 @@ export const mapDbExpenseToModel = (dbExpense: DbExpense): Expense => ({
   categoryId: dbExpense.category_id || '',
   paymentSourceId: dbExpense.payment_source_id || '',
   paymentType: dbExpense.payment_type as 'one-time' | 'installment' | 'recurring',
+  user_id: dbExpense.user_id,
   relatedExpenseId: undefined, // Field is missing in current DB schema
   installmentNumber: dbExpense.installment_count,
   totalInstallments: dbExpense.installment_count, // Total not in current schema, using same value
@@ -57,6 +58,7 @@ export const mapDbCategoryToModel = (dbCategory: DbCategory): ExpenseCategory =>
   id: dbCategory.id,
   name: dbCategory.name,
   color: dbCategory.color || '#3B82F6', // Default color if not provided
+  user_id: dbCategory.user_id,
   createdAt: dbCategory.created_at,
   updatedAt: dbCategory.updated_at
 });
@@ -71,7 +73,7 @@ export const mapModelToDbCategory = (category: ExpenseCategory, userId: string):
     color: category.color || '#3B82F6', // Ensure color has a default value
     created_at: category.createdAt || new Date().toISOString(),
     updated_at: category.updatedAt || new Date().toISOString(),
-    user_id: userId,
+    user_id: userId || category.user_id, // Use provided userId or from the category
   };
   
   return dbCategory;
@@ -85,6 +87,7 @@ export const mapDbPaymentSourceToModel = (dbSource: DbPaymentSource): PaymentSou
   name: dbSource.name,
   type: dbSource.type as 'cash' | 'credit' | 'bank' | 'other',
   color: dbSource.color || "#2196F3", // Default color if not provided
+  user_id: dbSource.user_id,
   createdAt: dbSource.created_at,
   updatedAt: dbSource.updated_at
 });
@@ -100,7 +103,7 @@ export const mapModelToDbPaymentSource = (source: PaymentSource, userId: string)
     color: source.color || "#2196F3", // Ensure color has a default value
     created_at: source.createdAt || new Date().toISOString(),
     updated_at: source.updatedAt || new Date().toISOString(),
-    user_id: userId,
+    user_id: userId || source.user_id, // Use provided userId or from the source
   };
   
   return dbSource;

@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ExpenseCategory } from "@/types/models";
 import { v4 as uuidv4 } from 'uuid';
+import { supabase } from "@/integrations/supabase/client";
 
 interface CategoryFormProps {
   category?: ExpenseCategory;
@@ -42,12 +43,30 @@ export function CategoryForm({ category, onSave, onCancel }: CategoryFormProps) 
         return;
       }
       
+      // Get the current user
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !authData.user) {
+        console.error("Authentication error:", authError);
+        toast({
+          title: "שגיאה",
+          description: "יש להתחבר מחדש למערכת",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+      
+      const userId = authData.user.id;
+      const now = new Date().toISOString();
+      
       const categoryData: ExpenseCategory = {
         id: category?.id || uuidv4(),
         name: name.trim(),
         color,
-        createdAt: category?.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        user_id: userId,
+        createdAt: category?.createdAt || now,
+        updatedAt: now,
       };
       
       await onSave(categoryData);

@@ -8,6 +8,7 @@ export interface ExpenseCategory {
   id: string;
   name: string;
   color: string;
+  user_id: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -16,6 +17,7 @@ export interface PaymentSource {
   id: string;
   name: string;
   type: 'cash' | 'credit' | 'bank' | 'other';
+  user_id: string;
   color?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -33,6 +35,7 @@ export interface Expense {
   categoryId: string;
   paymentSourceId: string;
   paymentType: PaymentType;
+  user_id: string;
   // For linking related expenses
   relatedExpenseId?: string;
   // For installment payments
