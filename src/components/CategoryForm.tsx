@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -17,28 +17,61 @@ export function CategoryForm({ category, onSave, onCancel }: CategoryFormProps) 
   const { toast } = useToast();
   const [name, setName] = useState(category?.name || "");
   const [color, setColor] = useState(category?.color || "#4CAF50");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const handleSubmit = (e: React.FormEvent) => {
+  // Reset form when category prop changes
+  useEffect(() => {
+    if (category) {
+      setName(category.name);
+      setColor(category.color);
+    }
+  }, [category]);
+  
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
-    if (!name.trim()) {
+    try {
+      if (!name.trim()) {
+        toast({
+          title: "שגיאה",
+          description: "שם הקטגוריה לא יכול להיות ריק",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+      
+      const categoryData: ExpenseCategory = {
+        id: category?.id || uuidv4(),
+        name: name.trim(),
+        color,
+        createdAt: category?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      
+      await onSave(categoryData);
+      
+      // Only reset the form if it's a new category (not editing)
+      if (!category) {
+        setName("");
+        setColor("#4CAF50");
+      }
+      
+      toast({
+        title: category ? "קטגוריה עודכנה" : "קטגוריה נוספה",
+        description: `הקטגוריה "${name}" ${category ? "עודכנה" : "נוספה"} בהצלחה`,
+      });
+    } catch (error) {
+      console.error("Error saving category:", error);
       toast({
         title: "שגיאה",
-        description: "שם הקטגוריה לא יכול להיות ריק",
+        description: error instanceof Error ? error.message : "אירעה שגיאה בשמירת הקטגוריה",
         variant: "destructive",
       });
-      return;
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    onSave({
-      id: category?.id || uuidv4(),
-      name,
-      color,
-    });
-    
-    // Reset form
-    setName("");
-    setColor("#4CAF50");
   };
   
   return (
@@ -78,11 +111,11 @@ export function CategoryForm({ category, onSave, onCancel }: CategoryFormProps) 
       </div>
       
       <div className="flex justify-end gap-2 pt-2">
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
           ביטול
         </Button>
-        <Button type="submit">
-          {category ? "עדכון" : "הוספה"}
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "שומר..." : category ? "עדכון" : "הוספה"}
         </Button>
       </div>
     </form>

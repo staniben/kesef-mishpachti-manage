@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -8,13 +8,36 @@ import { ExpenseCategory } from "@/types/models";
 import { Plus, Edit, Trash } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAppStore } from "@/store";
+import { Loader2 } from "lucide-react";
 
 export default function Categories() {
-  const { categories, addCategory, updateCategory, deleteCategory } = useAppStore();
+  const { categories, addCategory, updateCategory, deleteCategory, fetchCategories } = useAppStore();
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentCategory, setCurrentCategory] = useState<ExpenseCategory | undefined>();
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch categories when component mounts
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        setIsLoading(true);
+        await fetchCategories();
+      } catch (error) {
+        toast({
+          title: "שגיאה",
+          description: "אירעה שגיאה בטעינת הקטגוריות",
+          variant: "destructive",
+        });
+        console.error("Error fetching categories:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadCategories();
+  }, [fetchCategories, toast]);
 
   const handleAddCategory = async (category: ExpenseCategory) => {
     try {
@@ -30,6 +53,8 @@ export default function Categories() {
         description: "אירעה שגיאה בהוספת הקטגוריה",
         variant: "destructive",
       });
+      console.error("Error adding category:", error);
+      throw error; // Rethrow to be caught by the form
     }
   };
 
@@ -48,6 +73,8 @@ export default function Categories() {
         description: "אירעה שגיאה בעדכון הקטגוריה",
         variant: "destructive",
       });
+      console.error("Error updating category:", error);
+      throw error; // Rethrow to be caught by the form
     }
   };
 
@@ -70,9 +97,18 @@ export default function Categories() {
           description: error instanceof Error ? error.message : "אירעה שגיאה במחיקת הקטגוריה",
           variant: "destructive",
         });
+        console.error("Error deleting category:", error);
       }
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -85,29 +121,35 @@ export default function Categories() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        {categories.map((category) => (
-          <Card key={category.id}>
-            <CardHeader className="pb-2">
-              <div className="flex justify-between items-start">
-                <div className="flex items-center gap-2">
-                  <div
-                    className="w-4 h-4 rounded-full"
-                    style={{ backgroundColor: category.color }}
-                  />
-                  <CardTitle className="text-lg">{category.name}</CardTitle>
+        {categories.length === 0 ? (
+          <div className="col-span-full text-center p-8 text-gray-500">
+            אין קטגוריות. לחץ על "הוסף קטגוריה" ליצירת קטגוריה חדשה.
+          </div>
+        ) : (
+          categories.map((category) => (
+            <Card key={category.id}>
+              <CardHeader className="pb-2">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-4 h-4 rounded-full"
+                      style={{ backgroundColor: category.color }}
+                    />
+                    <CardTitle className="text-lg">{category.name}</CardTitle>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button size="icon" variant="ghost" onClick={() => handleEditClick(category)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" onClick={() => handleDeleteClick(category)}>
+                      <Trash className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex gap-1">
-                  <Button size="icon" variant="ghost" onClick={() => handleEditClick(category)}>
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button size="icon" variant="ghost" onClick={() => handleDeleteClick(category)}>
-                    <Trash className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
-        ))}
+              </CardHeader>
+            </Card>
+          ))
+        )}
       </div>
 
       {/* Add Category Dialog */}
