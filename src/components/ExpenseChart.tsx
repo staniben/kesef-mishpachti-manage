@@ -32,7 +32,7 @@ export function ExpenseChart({ onSliceClick }: { onSliceClick?: (id: string, typ
         const category = categories.find(cat => cat.id === categoryId);
         return {
           name: category?.name || "לא מוגדר",
-          value: total,
+          value: Number(total), // Ensure this is a number
           color: category?.color || "#999",
           id: categoryId
         };
@@ -46,7 +46,7 @@ export function ExpenseChart({ onSliceClick }: { onSliceClick?: (id: string, typ
         const source = paymentSources.find(src => src.id === sourceId);
         return {
           name: source?.name || "לא מוגדר",
-          value: total,
+          value: Number(total), // Ensure this is a number
           color: source?.color || "#999",
           id: sourceId
         };
