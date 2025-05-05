@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from "react";
-import { useSearchParams, useLocation } from "react-router-dom";
+import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,16 +8,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { RememberMeCheckbox } from "@/components/ui/RememberMeCheckbox";
-import { Mail } from "lucide-react";
+import { Mail, Check } from "lucide-react";
 import { UpdatePasswordForm } from "@/components/auth/UpdatePasswordForm";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { parseAuthHashParams, isPasswordResetUrl } from "@/utils/authUtils";
 
 export default function Auth() {
   const { signIn, signUp, resetPassword } = useAuth();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("login");
   
   const [loginEmail, setLoginEmail] = useState("");
@@ -33,6 +34,7 @@ export default function Auth() {
   
   const [resetEmail, setResetEmail] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState(false);
   
   // Extract error information from URL hash
   const [errorInfo, setErrorInfo] = useState<{
@@ -42,11 +44,25 @@ export default function Auth() {
   }>({ error: null, errorCode: null, errorDescription: null });
 
   // Determine if we should show the update password form
-  const showUpdatePassword = searchParams.get('type') === 'recovery';
+  const showUpdatePassword = searchParams.get('type') === 'recovery' || 
+    (location.hash && location.hash.includes('type=recovery'));
   
-  // Parse error information from URL hash
+  // Process URL hash for auth data
   useEffect(() => {
-    if (location.hash) {
+    // Check if we're coming from a recovery link
+    const hashParams = parseAuthHashParams();
+    
+    if (hashParams?.type === 'recovery' || hashParams?.accessToken) {
+      console.log('Detected recovery flow from hash parameters');
+      setActiveTab('update-password');
+      
+      // Clear the hash after processing to prevent issues on refresh
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    } 
+    // Process other hash parameters looking for errors
+    else if (location.hash) {
       const hashParams = new URLSearchParams(location.hash.substring(1));
       const error = hashParams.get('error');
       const errorCode = hashParams.get('error_code');
@@ -57,17 +73,23 @@ export default function Auth() {
         // If there's an OTP expired error, show the reset password tab
         if (errorCode === 'otp_expired') {
           setActiveTab('reset');
+          toast({
+            title: "קישור פג תוקף",
+            description: "קישור איפוס הסיסמה פג תוקף. אנא בקש קישור חדש.",
+            variant: "destructive",
+          });
         }
       }
     }
-  }, [location.hash]);
+  }, [location.hash, toast]);
   
   // Set the active tab based on the URL parameters
   useEffect(() => {
-    if (showUpdatePassword) {
+    if (searchParams.get('type') === 'recovery') {
+      console.log('Detected recovery from search params');
       setActiveTab('update-password');
     }
-  }, [showUpdatePassword]);
+  }, [searchParams]);
   
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -170,6 +192,10 @@ export default function Auth() {
     setResetLoading(true);
     try {
       await resetPassword(resetEmail);
+      
+      // Show success state
+      setResetSuccess(true);
+      
       toast({
         title: "הוראות לאיפוס סיסמה נשלחו",
         description: "בדוק את הדואר האלקטרוני שלך להמשך התהליך",
@@ -305,39 +331,61 @@ export default function Auth() {
                 </TabsContent>
 
                 <TabsContent value="reset">
-                  <form onSubmit={handleResetPassword} className="space-y-4">
-                    <div className="text-center mb-6">
-                      <Mail className="mx-auto h-12 w-12 text-primary" />
-                      <h3 className="mt-2 text-lg font-medium">שכחת את הסיסמה?</h3>
-                      <p className="text-sm text-muted-foreground">
-                        הזן את כתובת הדוא״ל שלך ונשלח לך הוראות לאיפוס הסיסמה
-                      </p>
-                      {errorInfo.errorCode === 'otp_expired' && (
-                        <p className="text-sm text-destructive mt-2">
-                          הקישור הקודם פג תוקף. אנא בקש קישור חדש.
+                  {!resetSuccess ? (
+                    <form onSubmit={handleResetPassword} className="space-y-4">
+                      <div className="text-center mb-6">
+                        <Mail className="mx-auto h-12 w-12 text-primary" />
+                        <h3 className="mt-2 text-lg font-medium">שכחת את הסיסמה?</h3>
+                        <p className="text-sm text-muted-foreground">
+                          הזן את כתובת הדוא״ל שלך ונשלח לך הוראות לאיפוס הסיסמה
                         </p>
-                      )}
+                        {errorInfo.errorCode === 'otp_expired' && (
+                          <p className="text-sm text-destructive mt-2">
+                            הקישור הקודם פג תוקף. אנא בקש קישור חדש.
+                          </p>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="reset-email">דוא״ל</Label>
+                        <Input 
+                          id="reset-email" 
+                          type="email" 
+                          value={resetEmail} 
+                          onChange={(e) => setResetEmail(e.target.value)} 
+                          placeholder="your@email.com"
+                        />
+                      </div>
+                      
+                      <Button 
+                        type="submit" 
+                        className="w-full" 
+                        disabled={resetLoading}
+                      >
+                        {resetLoading ? "שולח..." : "שלח הוראות לאיפוס סיסמה"}
+                      </Button>
+                    </form>
+                  ) : (
+                    <div className="p-4 text-center">
+                      <div className="bg-green-100 rounded-full p-3 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                        <Check className="h-8 w-8 text-green-600" />
+                      </div>
+                      <h3 className="text-xl font-medium mb-2">הוראות נשלחו!</h3>
+                      <p className="text-muted-foreground mb-6">
+                        הוראות לאיפוס הסיסמה נשלחו לדוא״ל שלך. אנא בדוק את תיבת הדואר הנכנס.
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setResetSuccess(false);
+                          setActiveTab("login");
+                        }}
+                        className="w-full"
+                      >
+                        חזור להתחברות
+                      </Button>
                     </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="reset-email">דוא״ל</Label>
-                      <Input 
-                        id="reset-email" 
-                        type="email" 
-                        value={resetEmail} 
-                        onChange={(e) => setResetEmail(e.target.value)} 
-                        placeholder="your@email.com"
-                      />
-                    </div>
-                    
-                    <Button 
-                      type="submit" 
-                      className="w-full" 
-                      disabled={resetLoading}
-                    >
-                      {resetLoading ? "שולח..." : "שלח הוראות לאיפוס סיסמה"}
-                    </Button>
-                  </form>
+                  )}
                 </TabsContent>
               </>
             ) : (

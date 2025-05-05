@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -199,7 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log(`Sending password reset email to: ${email}`);
       
       const redirectTo = getPasswordResetRedirectUrl();
-      console.log(`Redirect URL: ${redirectTo}`);
+      console.log(`Password reset redirect URL: ${redirectTo}`);
       
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo,

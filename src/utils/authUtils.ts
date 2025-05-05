@@ -72,9 +72,15 @@ export const signOut = async (): Promise<void> => {
  * @returns Base URL as a string
  */
 export const getBaseUrl = (): string => {
-  const currentUrl = window.location.href;
-  const url = new URL(currentUrl);
-  return `${url.protocol}//${url.host}`;
+  // Check if window is defined (we're in a browser)
+  if (typeof window !== 'undefined') {
+    const currentUrl = window.location.href;
+    const url = new URL(currentUrl);
+    return `${url.protocol}//${url.host}`;
+  }
+  
+  // Fallback for non-browser environments
+  return 'http://localhost:3000';
 };
 
 /**
@@ -83,6 +89,45 @@ export const getBaseUrl = (): string => {
  */
 export const getPasswordResetRedirectUrl = (): string => {
   const baseUrl = getBaseUrl();
+  // Using a query parameter instead of hash to make it easier to detect in the Auth component
   return `${baseUrl}/auth?type=recovery`;
 };
 
+/**
+ * Check if the current URL is a password reset URL by examining query parameters or hash values
+ * @returns Boolean indicating if the current URL is a password reset URL
+ */
+export const isPasswordResetUrl = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  
+  // Check query parameters
+  const searchParams = new URLSearchParams(window.location.search);
+  if (searchParams.get('type') === 'recovery') return true;
+  
+  // Check hash parameters
+  if (window.location.hash) {
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    return hashParams.get('type') === 'recovery';
+  }
+  
+  return false;
+};
+
+/**
+ * Parse token and type from URL hash
+ * @returns Object containing token and type if present
+ */
+export const parseAuthHashParams = () => {
+  if (typeof window === 'undefined' || !window.location.hash) return null;
+  
+  const hash = window.location.hash.substring(1);
+  const params = new URLSearchParams(hash);
+  
+  return {
+    accessToken: params.get('access_token'),
+    tokenType: params.get('token_type'),
+    expiresIn: params.get('expires_in'),
+    refreshToken: params.get('refresh_token'),
+    type: params.get('type'),
+  };
+};
