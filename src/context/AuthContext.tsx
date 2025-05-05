@@ -1,7 +1,7 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { getBaseUrl } from "@/utils/authUtils";
 
 interface AuthContextType {
   user: User | null;
@@ -10,8 +10,9 @@ interface AuthContextType {
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<void>; // Added new function
   isLoading: boolean;
-  isAuthenticated: boolean; // Added to easily check authentication status
+  isAuthenticated: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -21,6 +22,7 @@ const AuthContext = createContext<AuthContextType>({
   signUp: async () => {},
   signOut: async () => {},
   resetPassword: async () => {},
+  updatePassword: async () => {}, // Added new function
   isLoading: true,
   isAuthenticated: false,
 });
@@ -195,8 +197,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log(`Sending password reset email to: ${email}`);
       
+      const redirectTo = `${getBaseUrl()}/auth?type=recovery`;
+      console.log(`Redirect URL: ${redirectTo}`);
+      
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + '/auth',
+        redirectTo,
       });
       
       if (error) {
@@ -211,6 +216,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updatePassword = async (newPassword: string) => {
+    try {
+      console.log('Attempting to update password');
+      
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      
+      if (error) {
+        console.error("Password update error:", error.message);
+        throw error;
+      }
+      
+      console.log("Password updated successfully");
+    } catch (error) {
+      console.error("Password update error:", error);
+      throw error;
+    }
+  };
+
   const value = {
     user,
     session,
@@ -218,6 +243,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signUp,
     signOut,
     resetPassword,
+    updatePassword, // Added new function
     isLoading,
     isAuthenticated,
   };

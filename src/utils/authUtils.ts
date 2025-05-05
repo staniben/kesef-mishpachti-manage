@@ -1,4 +1,3 @@
-
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -65,4 +64,14 @@ export const signOut = async (): Promise<void> => {
     console.error('Error signing out:', error);
     throw error;
   }
+};
+
+/**
+ * Gets the base URL for the current environment (production or development)
+ * @returns Base URL as a string
+ */
+export const getBaseUrl = (): string => {
+  const currentUrl = window.location.href;
+  const url = new URL(currentUrl);
+  return `${url.protocol}//${url.host}`;
 };
