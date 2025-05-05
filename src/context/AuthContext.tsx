@@ -9,6 +9,7 @@ interface AuthContextType {
   signIn: (email: string, password: string, persistSession?: boolean) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   isLoading: boolean;
   isAuthenticated: boolean; // Added to easily check authentication status
 }
@@ -19,6 +20,7 @@ const AuthContext = createContext<AuthContextType>({
   signIn: async () => {},
   signUp: async () => {},
   signOut: async () => {},
+  resetPassword: async () => {},
   isLoading: true,
   isAuthenticated: false,
 });
@@ -189,12 +191,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const resetPassword = async (email: string) => {
+    try {
+      console.log(`Sending password reset email to: ${email}`);
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/auth',
+      });
+      
+      if (error) {
+        console.error("Password reset error:", error.message);
+        throw error;
+      }
+      
+      console.log("Password reset email sent successfully");
+    } catch (error) {
+      console.error("Password reset error:", error);
+      throw error;
+    }
+  };
+
   const value = {
     user,
     session,
     signIn,
     signUp,
     signOut,
+    resetPassword,
     isLoading,
     isAuthenticated,
   };

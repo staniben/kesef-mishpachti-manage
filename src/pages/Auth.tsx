@@ -8,9 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { RememberMeCheckbox } from "@/components/ui/RememberMeCheckbox";
+import { Mail } from "lucide-react";
 
 export default function Auth() {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, resetPassword } = useAuth();
   const { toast } = useToast();
   
   const [loginEmail, setLoginEmail] = useState("");
@@ -22,6 +23,9 @@ export default function Auth() {
   const [registerPassword, setRegisterPassword] = useState("");
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState("");
   const [registerLoading, setRegisterLoading] = useState(false);
+  
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
   
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,6 +112,40 @@ export default function Auth() {
       setRegisterLoading(false);
     }
   };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!resetEmail) {
+      toast({
+        title: "שגיאה",
+        description: "נא להזין כתובת דוא״ל",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setResetLoading(true);
+    try {
+      await resetPassword(resetEmail);
+      toast({
+        title: "הוראות לאיפוס סיסמה נשלחו",
+        description: "בדוק את הדואר האלקטרוני שלך להמשך התהליך",
+      });
+      
+      // Clear form
+      setResetEmail("");
+    } catch (error) {
+      console.error("Password reset error:", error);
+      toast({
+        title: "שגיאה באיפוס סיסמה",
+        description: error instanceof Error ? error.message : "אירעה שגיאה באיפוס הסיסמה",
+        variant: "destructive",
+      });
+    } finally {
+      setResetLoading(false);
+    }
+  };
   
   return (
     <div className="container mx-auto flex items-center justify-center min-h-screen px-4">
@@ -117,9 +155,10 @@ export default function Auth() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="login">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsList className="grid w-full grid-cols-3 mb-6">
               <TabsTrigger value="login">התחברות</TabsTrigger>
               <TabsTrigger value="register">הרשמה</TabsTrigger>
+              <TabsTrigger value="reset">שחזור סיסמה</TabsTrigger>
             </TabsList>
             
             <TabsContent value="login">
@@ -200,6 +239,37 @@ export default function Auth() {
                   disabled={registerLoading}
                 >
                   {registerLoading ? "נרשם..." : "הרשם"}
+                </Button>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="reset">
+              <form onSubmit={handleResetPassword} className="space-y-4">
+                <div className="text-center mb-6">
+                  <Mail className="mx-auto h-12 w-12 text-primary" />
+                  <h3 className="mt-2 text-lg font-medium">שכחת את הסיסמה?</h3>
+                  <p className="text-sm text-muted-foreground">
+                    הזן את כתובת הדוא״ל שלך ונשלח לך הוראות לאיפוס הסיסמה
+                  </p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="reset-email">דוא״ל</Label>
+                  <Input 
+                    id="reset-email" 
+                    type="email" 
+                    value={resetEmail} 
+                    onChange={(e) => setResetEmail(e.target.value)} 
+                    placeholder="your@email.com"
+                  />
+                </div>
+                
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={resetLoading}
+                >
+                  {resetLoading ? "שולח..." : "שלח הוראות לאיפוס סיסמה"}
                 </Button>
               </form>
             </TabsContent>
