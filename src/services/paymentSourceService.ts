@@ -27,9 +27,17 @@ export async function addPaymentSource(paymentSource: Omit<PaymentSource, 'id'>)
       user_id: paymentSource.user_id
     };
 
+    // Cast the snake_case object to the correct type for Supabase insertion
+    const snakeCaseObj = toSnakeCase(paymentSourceData) as {
+      name: string;
+      type: "cash" | "credit" | "bank" | "other";
+      color?: string;
+      user_id: string;
+    };
+
     const { data, error } = await supabase
       .from('payment_sources')
-      .insert([toSnakeCase(paymentSourceData)])
+      .insert([snakeCaseObj])
       .select()
       .single();
       
@@ -55,9 +63,18 @@ export async function updatePaymentSource(paymentSource: PaymentSource): Promise
       user_id: paymentSource.user_id
     };
 
+    // Cast the snake_case object to the correct type for Supabase update
+    const snakeCaseObj = toSnakeCase(paymentSourceData) as {
+      id: string;
+      name: string;
+      type: "cash" | "credit" | "bank" | "other";
+      color?: string;
+      user_id: string;
+    };
+
     const { data, error } = await supabase
       .from('payment_sources')
-      .update(toSnakeCase(paymentSourceData))
+      .update(snakeCaseObj)
       .eq('id', paymentSource.id)
       .select()
       .single();
