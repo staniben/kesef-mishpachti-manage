@@ -1,7 +1,8 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { getBaseUrl } from "@/utils/authUtils";
+import { getBaseUrl, getPasswordResetRedirectUrl } from "@/utils/authUtils";
 
 interface AuthContextType {
   user: User | null;
@@ -10,7 +11,7 @@ interface AuthContextType {
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
-  updatePassword: (newPassword: string) => Promise<void>; // Added new function
+  updatePassword: (newPassword: string) => Promise<void>;
   isLoading: boolean;
   isAuthenticated: boolean;
 }
@@ -22,7 +23,7 @@ const AuthContext = createContext<AuthContextType>({
   signUp: async () => {},
   signOut: async () => {},
   resetPassword: async () => {},
-  updatePassword: async () => {}, // Added new function
+  updatePassword: async () => {},
   isLoading: true,
   isAuthenticated: false,
 });
@@ -197,7 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log(`Sending password reset email to: ${email}`);
       
-      const redirectTo = `${getBaseUrl()}/auth?type=recovery`;
+      const redirectTo = getPasswordResetRedirectUrl();
       console.log(`Redirect URL: ${redirectTo}`);
       
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -243,7 +244,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signUp,
     signOut,
     resetPassword,
-    updatePassword, // Added new function
+    updatePassword,
     isLoading,
     isAuthenticated,
   };

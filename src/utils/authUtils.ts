@@ -1,3 +1,4 @@
+
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -75,3 +76,13 @@ export const getBaseUrl = (): string => {
   const url = new URL(currentUrl);
   return `${url.protocol}//${url.host}`;
 };
+
+/**
+ * Builds the redirect URL for password reset
+ * @returns Complete redirect URL as a string
+ */
+export const getPasswordResetRedirectUrl = (): string => {
+  const baseUrl = getBaseUrl();
+  return `${baseUrl}/auth?type=recovery`;
+};
+

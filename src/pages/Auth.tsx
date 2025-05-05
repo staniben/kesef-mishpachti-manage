@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,11 +11,14 @@ import { useToast } from "@/hooks/use-toast";
 import { RememberMeCheckbox } from "@/components/ui/RememberMeCheckbox";
 import { Mail } from "lucide-react";
 import { UpdatePasswordForm } from "@/components/auth/UpdatePasswordForm";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 export default function Auth() {
   const { signIn, signUp, resetPassword } = useAuth();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState("login");
   
   const [loginEmail, setLoginEmail] = useState("");
@@ -29,9 +33,34 @@ export default function Auth() {
   
   const [resetEmail, setResetEmail] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
+  
+  // Extract error information from URL hash
+  const [errorInfo, setErrorInfo] = useState<{
+    error: string | null;
+    errorCode: string | null;
+    errorDescription: string | null;
+  }>({ error: null, errorCode: null, errorDescription: null });
 
   // Determine if we should show the update password form
   const showUpdatePassword = searchParams.get('type') === 'recovery';
+  
+  // Parse error information from URL hash
+  useEffect(() => {
+    if (location.hash) {
+      const hashParams = new URLSearchParams(location.hash.substring(1));
+      const error = hashParams.get('error');
+      const errorCode = hashParams.get('error_code');
+      const errorDescription = hashParams.get('error_description')?.replace(/\+/g, ' ');
+      
+      if (error) {
+        setErrorInfo({ error, errorCode, errorDescription });
+        // If there's an OTP expired error, show the reset password tab
+        if (errorCode === 'otp_expired') {
+          setActiveTab('reset');
+        }
+      }
+    }
+  }, [location.hash]);
   
   // Set the active tab based on the URL parameters
   useEffect(() => {
@@ -146,8 +175,9 @@ export default function Auth() {
         description: "בדוק את הדואר האלקטרוני שלך להמשך התהליך",
       });
       
-      // Clear form
+      // Clear form and error info after successful request
       setResetEmail("");
+      setErrorInfo({ error: null, errorCode: null, errorDescription: null });
     } catch (error) {
       console.error("Password reset error:", error);
       toast({
@@ -167,6 +197,16 @@ export default function Auth() {
           <CardTitle className="text-2xl">מערכת ניהול הוצאות</CardTitle>
         </CardHeader>
         <CardContent>
+          {errorInfo.error && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>שגיאה באיפוס סיסמה</AlertTitle>
+              <AlertDescription>
+                {errorInfo.errorDescription || 'קישור לאיפוס הסיסמה אינו תקף או שפג תוקפו. אנא בקש קישור חדש.'}
+              </AlertDescription>
+            </Alert>
+          )}
+          
           <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab}>
             <TabsList className={`grid w-full ${showUpdatePassword ? 'grid-cols-1' : 'grid-cols-3'} mb-6`}>
               {!showUpdatePassword ? (
@@ -272,6 +312,11 @@ export default function Auth() {
                       <p className="text-sm text-muted-foreground">
                         הזן את כתובת הדוא״ל שלך ונשלח לך הוראות לאיפוס הסיסמה
                       </p>
+                      {errorInfo.errorCode === 'otp_expired' && (
+                        <p className="text-sm text-destructive mt-2">
+                          הקישור הקודם פג תוקף. אנא בקש קישור חדש.
+                        </p>
+                      )}
                     </div>
                     
                     <div className="space-y-2">
