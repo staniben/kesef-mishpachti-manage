@@ -1,4 +1,3 @@
-
 import { ExpenseCategory } from '@/types/models';
 import { supabase } from '@/integrations/supabase/client';
 import { generateId } from './mockData';
@@ -12,6 +11,7 @@ const mapDbCategoryToModel = (dbCategory: any): ExpenseCategory => ({
   id: dbCategory.id,
   name: dbCategory.name,
   color: dbCategory.color || '#3B82F6', // Default color if not provided
+  user_id: dbCategory.user_id,
   createdAt: dbCategory.created_at,
   updatedAt: dbCategory.updated_at
 });
@@ -25,7 +25,7 @@ const mapModelToDbCategory = (category: ExpenseCategory) => ({
   color: category.color,
   created_at: category.createdAt,
   updated_at: category.updatedAt,
-  user_id: null // Will be set in each method with the authenticated user's ID
+  user_id: category.user_id // Include user_id from the category object
 });
 
 /**

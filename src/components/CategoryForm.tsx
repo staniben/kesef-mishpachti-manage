@@ -64,7 +64,7 @@ export function CategoryForm({ category, onSave, onCancel }: CategoryFormProps) 
         id: category?.id || uuidv4(),
         name: name.trim(),
         color,
-        user_id: userId,
+        user_id: category?.user_id || userId,
         createdAt: category?.createdAt || now,
         updatedAt: now,
       };

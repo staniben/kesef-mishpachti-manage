@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { PaymentSource } from "@/types/models";
 import { v4 as uuidv4 } from 'uuid';
-import { Checkbox } from "@/components/ui/checkbox";
+import { supabase } from "@/integrations/supabase/client";
 
 interface PaymentSourceFormProps {
   source?: PaymentSource;
@@ -22,7 +22,7 @@ export function PaymentSourceForm({ source, onSave, onCancel }: PaymentSourceFor
   const [color, setColor] = useState(source?.color || "#2196F3");
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     
@@ -37,11 +37,28 @@ export function PaymentSourceForm({ source, onSave, onCancel }: PaymentSourceFor
         return;
       }
       
+      // Get the current user
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !authData.user) {
+        console.error("Authentication error:", authError);
+        toast({
+          title: "שגיאה",
+          description: "יש להתחבר מחדש למערכת",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+      
+      const userId = authData.user.id;
+      
       const paymentSource: PaymentSource = {
         id: source?.id || uuidv4(),
         name: name.trim(),
         type,
         color: color || "#2196F3", // Ensure color has a default
+        user_id: source?.user_id || userId,
       };
       
       console.log("Submitting payment source:", paymentSource);

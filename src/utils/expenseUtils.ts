@@ -1,183 +1,115 @@
-import { format, addMonths } from 'date-fns';
-import { Expense, PaymentType, RecurrenceType } from '@/types/models';
+import { Expense } from '@/types/models';
 import { v4 as uuidv4 } from 'uuid';
+import { addMonths } from 'date-fns';
+
+// Define a type for the form data
+export type ExpenseFormData = {
+  id?: string;
+  name: string;
+  amount: string;
+  date?: Date;
+  time?: string;
+  categoryId: string;
+  paymentSourceId: string;
+  paymentType: string;
+  totalAmount: string;
+  numberOfInstallments: string;
+  startDate?: Date;
+};
+
+// Helper to generate new ID (will be replaced with database IDs in the future)
+export const generateId = (): string => {
+  return uuidv4();
+};
 
 /**
- * Creates a base expense object from form data
+ * Creates a single expense object from form data
  */
-export const createBaseExpense = (
-  editId: string | undefined,
-  amount: number,
-  date: Date,
-  time: string,
-  name: string,
-  categoryId: string,
-  paymentSourceId: string,
-  paymentType: PaymentType
-): Expense => {
-  // Format the date as ISO string (YYYY-MM-DD)
-  const formattedDate = format(date, "yyyy-MM-dd");
+export const createSingleExpenseFromForm = (formData: ExpenseFormData, userId: string): Expense => {
+  const now = new Date().toISOString();
   
   return {
-    id: editId || uuidv4(),
-    amount,
-    date: formattedDate,
-    time,
-    name,
-    categoryId,
-    paymentSourceId,
-    paymentType,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    id: formData.id || generateId(),
+    amount: Number(formData.amount),
+    date: formData.date?.toISOString().split('T')[0] || now.split('T')[0],
+    time: formData.time || '00:00',
+    name: formData.name,
+    categoryId: formData.categoryId,
+    paymentSourceId: formData.paymentSourceId,
+    paymentType: formData.paymentType,
+    user_id: userId,
+    createdAt: now,
+    updatedAt: now,
   };
 };
 
 /**
- * Generate a batch of installment expenses
+ * Creates an array of installment expenses from form data
  */
-export const generateInstallmentExpenses = (
-  totalAmount: number,
-  installments: number,
-  startDate: Date,
-  name: string,
-  categoryId: string,
-  paymentSourceId: string,
-  time: string = "00:00"
-): Expense[] => {
-  if (installments < 2) {
-    throw new Error("Installments must be at least 2");
+export const createInstallmentExpensesFromForm = (formData: ExpenseFormData, userId: string): Expense[] => {
+  const now = new Date().toISOString();
+  const totalAmount = Number(formData.totalAmount);
+  const numberOfInstallments = Number(formData.numberOfInstallments);
+  const startDate = formData.startDate || new Date();
+  
+  // Validate that totalAmount and numberOfInstallments are valid numbers
+  if (isNaN(totalAmount) || isNaN(numberOfInstallments) || numberOfInstallments <= 0) {
+    console.error("Invalid totalAmount or numberOfInstallments");
+    return [];
   }
   
-  if (totalAmount <= 0) {
-    throw new Error("Total amount must be positive");
-  }
-
-  const monthlyAmount = totalAmount / installments;
-  const installmentExpenses: Expense[] = [];
-  const recurrenceId = uuidv4();
+  // Generate the installment expenses
+  const installments: Expense[] = [];
+  const installmentAmount = totalAmount / numberOfInstallments;
   
-  for (let i = 0; i < installments; i++) {
+  for (let i = 0; i < numberOfInstallments; i++) {
     const installmentDate = addMonths(startDate, i);
-    const formattedDate = format(installmentDate, "yyyy-MM-dd");
+    const formattedDate = installmentDate.toISOString().split('T')[0];
     
-    const expense: Expense = {
-      id: uuidv4(),
-      amount: monthlyAmount,
+    installments.push({
+      id: generateId(),
+      amount: installmentAmount,
       date: formattedDate,
-      time,
-      name: `${name} (${i+1}/${installments})`,
-      categoryId,
-      paymentSourceId,
-      paymentType: "installment",
+      time: '00:00',
+      name: `${formData.name} (${i + 1}/${numberOfInstallments})`,
+      categoryId: formData.categoryId,
+      paymentSourceId: formData.paymentSourceId,
+      paymentType: 'installment',
       installmentNumber: i + 1,
-      totalInstallments: installments,
+      totalInstallments: numberOfInstallments,
       isInstallment: true,
-      relatedExpenseId: i > 0 ? installmentExpenses[0].id : undefined,
-      recurrenceId, // Add recurrenceId to group installments together
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    
-    installmentExpenses.push(expense);
+      user_id: userId,
+      createdAt: now,
+      updatedAt: now,
+    });
   }
   
-  return installmentExpenses;
+  return installments;
 };
 
 /**
- * Generate a batch of recurring expenses
+ * Creates a recurring expense from form data
  */
-export const generateRecurringExpenses = (
-  amount: number,
-  startDate: Date,
-  name: string,
-  categoryId: string,
-  paymentSourceId: string,
-  time: string = "00:00", 
-  months: number = 12
-): Expense[] => {
-  if (amount <= 0) {
-    throw new Error("Amount must be positive");
-  }
+export const createRecurringExpenseFromForm = (formData: ExpenseFormData, userId: string): Expense => {
+  const now = new Date().toISOString();
+  const startDate = formData.startDate || new Date();
   
-  const recurringExpenses: Expense[] = [];
-  const recurrenceId = uuidv4();
-  const recurrenceType: RecurrenceType = "monthly";
-  
-  for (let i = 0; i < months; i++) {
-    const recurringDate = addMonths(startDate, i);
-    const formattedDate = format(recurringDate, "yyyy-MM-dd");
-    
-    const expense: Expense = {
-      id: uuidv4(),
-      amount,
-      date: formattedDate,
-      time,
-      name,
-      categoryId,
-      paymentSourceId,
-      paymentType: "recurring",
-      isRecurring: true,
-      recurrenceId,
-      recurrenceType,
-      totalInstallments: months, // Add total months as totalInstallments
-      installmentNumber: i + 1,  // Track which recurrence this is
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    
-    recurringExpenses.push(expense);
-  }
-  
-  return recurringExpenses;
-};
-
-/**
- * Calculate total expenses
- */
-export const calculateTotalExpenses = (expenses: Expense[]): number => {
-  return expenses.reduce((sum, expense) => sum + expense.amount, 0);
-};
-
-/**
- * Group expenses by category
- */
-export const groupExpensesByCategory = (expenses: Expense[]): Record<string, number> => {
-  return expenses.reduce((acc, expense) => {
-    const { categoryId, amount } = expense;
-    acc[categoryId] = (acc[categoryId] || 0) + amount;
-    return acc;
-  }, {} as Record<string, number>);
-};
-
-/**
- * Group expenses by payment source
- */
-export const groupExpensesByPaymentSource = (expenses: Expense[]): Record<string, number> => {
-  return expenses.reduce((acc, expense) => {
-    const { paymentSourceId, amount } = expense;
-    acc[paymentSourceId] = (acc[paymentSourceId] || 0) + amount;
-    return acc;
-  }, {} as Record<string, number>);
-};
-
-/**
- * Filter expenses by month and year
- */
-export const filterExpensesByMonth = (expenses: Expense[], month: number, year: number): Expense[] => {
-  return expenses.filter(expense => {
-    const date = new Date(expense.date);
-    return date.getMonth() === month && date.getFullYear() === year;
-  });
-};
-
-/**
- * Sort expenses by date (newest first)
- */
-export const sortExpensesByDate = (expenses: Expense[], descending: boolean = true): Expense[] => {
-  return [...expenses].sort((a, b) => {
-    const dateA = new Date(a.date).getTime();
-    const dateB = new Date(b.date).getTime();
-    return descending ? dateB - dateA : dateA - dateB;
-  });
+  return {
+    id: formData.id || generateId(),
+    amount: Number(formData.amount),
+    date: startDate.toISOString().split('T')[0],
+    time: '00:00',
+    name: formData.name,
+    categoryId: formData.categoryId,
+    paymentSourceId: formData.paymentSourceId,
+    paymentType: 'recurring',
+    isRecurring: true,
+    recurrenceId: generateId(),
+    recurrenceType: 'monthly', // Currently only supporting monthly
+    totalInstallments: 0, // Infinite
+    installmentNumber: 1,
+    user_id: userId,
+    createdAt: now,
+    updatedAt: now,
+  };
 };

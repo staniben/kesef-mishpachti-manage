@@ -45,7 +45,7 @@ export const mapModelToDbExpense = (expense: Expense, userId: string): Partial<D
     recurring_interval: expense.recurrenceType,
     created_at: expense.createdAt || new Date().toISOString(),
     updated_at: expense.updatedAt || new Date().toISOString(),
-    user_id: userId,
+    user_id: userId || expense.user_id, // Use provided userId or from the expense
   };
   
   return dbExpense;

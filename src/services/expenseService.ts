@@ -13,6 +13,7 @@ const mapDbExpenseToModel = (dbExpense: any): Expense => ({
   categoryId: dbExpense.category_id || '',
   paymentSourceId: dbExpense.payment_source_id || '',
   paymentType: dbExpense.payment_type,
+  user_id: dbExpense.user_id,
   relatedExpenseId: dbExpense.related_expense_id,
   installmentNumber: dbExpense.installment_count,
   totalInstallments: dbExpense.total_installments,
