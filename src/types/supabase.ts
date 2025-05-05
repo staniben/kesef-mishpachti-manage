@@ -41,3 +41,8 @@ export interface DbPaymentSource {
 }
 
 export type TableName = 'categories' | 'expenses' | 'payment_sources';
+
+// Adding RPC function return type definitions
+export interface RpcFunctionReturnTypes {
+  get_auth_uid: string; // The function returns the user's UUID as a string
+}
