@@ -1,6 +1,20 @@
-
 import { Expense, ExpenseCategory, PaymentSource } from '@/types/models';
 import { DbCategory, DbExpense, DbPaymentSource } from '@/types/supabase';
+
+/**
+ * Converts object keys from camelCase to snake_case
+ */
+export function toSnakeCase(obj: Record<string, any>): Record<string, any> {
+  if (typeof obj !== 'object' || obj === null) return obj;
+  if (Array.isArray(obj)) return obj.map(toSnakeCase);
+
+  return Object.fromEntries(
+    Object.entries(obj).map(([key, value]) => [
+      key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`),
+      toSnakeCase(value)
+    ])
+  );
+}
 
 /**
  * Maps database expense to frontend expense model

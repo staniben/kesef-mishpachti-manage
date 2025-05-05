@@ -8,7 +8,7 @@ export function mapPaymentSourceForInsert(paymentSource: any): PaymentSource {
   return {
     id: paymentSource.id,
     name: paymentSource.name,
-    type: paymentSource.type,
+    type: (paymentSource.type as "cash" | "credit" | "bank" | "other"), // Properly cast to ensure type safety
     color: paymentSource.color,
     user_id: paymentSource.user_id || 'mock-user-id', // Add default user_id
     createdAt: paymentSource.createdAt,
@@ -19,14 +19,24 @@ export function mapPaymentSourceForInsert(paymentSource: any): PaymentSource {
 // Add new payment source
 export async function addPaymentSource(paymentSource: Omit<PaymentSource, 'id'>): Promise<PaymentSource | null> {
   try {
+    // Ensure we're only passing valid data to Supabase
+    const paymentSourceData = {
+      name: paymentSource.name,
+      type: paymentSource.type,
+      color: paymentSource.color,
+      user_id: paymentSource.user_id
+    };
+
     const { data, error } = await supabase
       .from('payment_sources')
-      .insert([toSnakeCase(paymentSource)])
+      .insert([toSnakeCase(paymentSourceData)])
       .select()
       .single();
       
     if (error) throw error;
-    return data;
+    
+    // Cast the returned data to PaymentSource type
+    return data as unknown as PaymentSource;
   } catch (error) {
     console.error('Error adding payment source:', error);
     return null;
@@ -36,15 +46,26 @@ export async function addPaymentSource(paymentSource: Omit<PaymentSource, 'id'>)
 // Update payment source
 export async function updatePaymentSource(paymentSource: PaymentSource): Promise<PaymentSource | null> {
   try {
+    // Ensure we're only passing valid data to Supabase
+    const paymentSourceData = {
+      id: paymentSource.id,
+      name: paymentSource.name,
+      type: paymentSource.type,
+      color: paymentSource.color,
+      user_id: paymentSource.user_id
+    };
+
     const { data, error } = await supabase
       .from('payment_sources')
-      .update(toSnakeCase(paymentSource))
+      .update(toSnakeCase(paymentSourceData))
       .eq('id', paymentSource.id)
       .select()
       .single();
       
     if (error) throw error;
-    return data;
+    
+    // Cast the returned data to PaymentSource type
+    return data as unknown as PaymentSource;
   } catch (error) {
     console.error('Error updating payment source:', error);
     return null;
@@ -84,9 +105,19 @@ export async function getPaymentSources(): Promise<PaymentSource[]> {
       .eq('user_id', user.id);
       
     if (error) throw error;
-    return data || [];
+    
+    // Cast the returned data to PaymentSource[] type
+    return (data || []) as unknown as PaymentSource[];
   } catch (error) {
     console.error('Error getting payment sources:', error);
     return [];
   }
 }
+
+// Export the service as an object for use in other files
+export const paymentSourceService = {
+  getAll: getPaymentSources,
+  create: addPaymentSource,
+  update: updatePaymentSource,
+  delete: deletePaymentSource
+};
