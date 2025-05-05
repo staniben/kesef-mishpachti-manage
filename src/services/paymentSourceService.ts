@@ -52,8 +52,25 @@ export async function addPaymentSource(paymentSource: Omit<PaymentSource, 'id'>)
 }
 
 // Update payment source
-export async function updatePaymentSource(paymentSource: PaymentSource): Promise<PaymentSource | null> {
+// Modified to handle both separate params and single object
+export async function updatePaymentSource(paymentSourceOrId: PaymentSource | string, partialSource?: Partial<PaymentSource>): Promise<PaymentSource | null> {
   try {
+    // Handle both calling conventions:
+    // 1. update(source) - single parameter with complete object including id
+    // 2. update(id, source) - separate id and partial source object
+    let paymentSource: PaymentSource;
+    
+    if (typeof paymentSourceOrId === 'string' && partialSource) {
+      // Handle: update(id, partialSource)
+      paymentSource = {
+        ...partialSource,
+        id: paymentSourceOrId
+      } as PaymentSource;
+    } else {
+      // Handle: update(source)
+      paymentSource = paymentSourceOrId as PaymentSource;
+    }
+
     // Ensure we're only passing valid data to Supabase
     const paymentSourceData = {
       id: paymentSource.id,
