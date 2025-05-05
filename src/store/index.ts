@@ -194,7 +194,7 @@ export const useAppStore = create<StoreState>()(
       updatePaymentSource: async (id, source) => {
         try {
           console.log(`Updating payment source ${id}:`, source);
-          const updatedSource = await paymentSourceService.update(source);
+          const updatedSource = await paymentSourceService.update(id, source);
           console.log("Updated payment source:", updatedSource);
           
           set((state) => ({

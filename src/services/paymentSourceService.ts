@@ -51,36 +51,27 @@ export async function addPaymentSource(paymentSource: Omit<PaymentSource, 'id'>)
   }
 }
 
-// Update payment source
-// Modified to handle both separate params and single object
-export async function updatePaymentSource(paymentSourceOrId: PaymentSource | string, partialSource?: Partial<PaymentSource>): Promise<PaymentSource | null> {
+// Update payment source with the new interface
+export async function updatePaymentSource(
+  id: string,
+  partialSource: Partial<PaymentSource>
+): Promise<PaymentSource | null> {
   try {
-    // Handle both calling conventions:
-    // 1. update(source) - single parameter with complete object including id
-    // 2. update(id, source) - separate id and partial source object
-    let paymentSource: PaymentSource;
-    
-    if (typeof paymentSourceOrId === 'string' && partialSource) {
-      // Handle: update(id, partialSource)
-      paymentSource = {
-        ...partialSource,
-        id: paymentSourceOrId
-      } as PaymentSource;
-    } else {
-      // Handle: update(source)
-      paymentSource = paymentSourceOrId as PaymentSource;
-    }
+    // Merge the id into the partial source
+    const paymentSource = {
+      ...partialSource,
+      id,
+    } as PaymentSource;
 
-    // Ensure we're only passing valid data to Supabase
+    // Prepare the data for Supabase (convert to snake_case, etc.)
     const paymentSourceData = {
       id: paymentSource.id,
       name: paymentSource.name,
       type: paymentSource.type,
       color: paymentSource.color,
-      user_id: paymentSource.user_id
+      user_id: paymentSource.user_id,
     };
 
-    // Cast the snake_case object to the correct type for Supabase update
     const snakeCaseObj = toSnakeCase(paymentSourceData) as {
       id: string;
       name: string;
@@ -92,10 +83,10 @@ export async function updatePaymentSource(paymentSourceOrId: PaymentSource | str
     const { data, error } = await supabase
       .from('payment_sources')
       .update(snakeCaseObj)
-      .eq('id', paymentSource.id)
+      .eq('id', id)
       .select()
       .single();
-      
+
     if (error) throw error;
     
     // Cast the returned data to PaymentSource type
@@ -152,6 +143,6 @@ export async function getPaymentSources(): Promise<PaymentSource[]> {
 export const paymentSourceService = {
   getAll: getPaymentSources,
   create: addPaymentSource,
-  update: updatePaymentSource,
+  update: updatePaymentSource, // Now expects (id, partialSource)
   delete: deletePaymentSource
 };
