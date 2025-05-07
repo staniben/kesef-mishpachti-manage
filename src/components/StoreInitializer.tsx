@@ -4,6 +4,7 @@ import { useAppStore } from "@/store";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { checkRlsAccess } from "@/integrations/supabase/client";
 
 export function StoreInitializer() {
   const { toast } = useToast();
@@ -13,30 +14,69 @@ export function StoreInitializer() {
   const [isFirstLoad, setIsFirstLoad] = useState(true);
   const [initializationAttempts, setInitializationAttempts] = useState(0);
   
-  // Debug function to check RLS access
-  const checkRlsAccess = async () => {
+  // Enhanced debug function to check RLS access
+  const checkDetailedRlsAccess = async () => {
     if (!user) return;
     
     try {
-      // Try a simple select query to check if RLS is allowing access
-      console.log("Testing RLS for categories...");
-      const { data: catData, error: catError } = await supabase
-        .from('categories')
-        .select('count(*)', { count: 'exact', head: true });
+      // First use the built-in utility
+      const rlsCheckResult = await checkRlsAccess();
+      console.log("Basic RLS check result:", rlsCheckResult);
       
-      if (catError) {
-        console.error("RLS check for categories failed:", catError);
-      } else {
-        console.log("RLS check for categories passed! Access granted.");
+      if (!rlsCheckResult.success) {
+        console.error("❗ Basic RLS check failed! This is likely preventing data access.");
+        toast({
+          title: "שגיאת הרשאות RLS",
+          description: "בדיקת הרשאות RLS נכשלה. יתכן שלא יהיה ניתן לגשת לנתונים.",
+          variant: "destructive",
+        });
       }
       
-      // Check if user_id is being properly recognized
-      console.log("Testing auth.uid() in RLS...");
+      // Test each table individually with detailed logging
+      const tables = ['categories', 'expenses', 'payment_sources', 'profiles'];
+      
+      for (const table of tables) {
+        console.log(`Testing RLS access for table: ${table}...`);
+        
+        // Test count access
+        const { count, error: countError } = await supabase
+          .from(table)
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id);
+          
+        if (countError) {
+          console.error(`❌ RLS check for ${table} count failed:`, countError);
+          console.error(`  - Code: ${countError.code}`);
+          console.error(`  - Message: ${countError.message}`);
+          console.error(`  - Details: ${countError.details}`);
+          console.error(`  - Hint: ${countError.hint}`);
+        } else {
+          console.log(`✅ RLS check for ${table} passed! Found ${count} records`);
+          
+          // If count > 0, try to fetch one record to verify full access
+          if (count && count > 0) {
+            const { data, error: fetchError } = await supabase
+              .from(table)
+              .select('*')
+              .eq('user_id', user.id)
+              .limit(1)
+              .single();
+              
+            if (fetchError) {
+              console.error(`❌ RLS check for ${table} data fetch failed:`, fetchError);
+            } else {
+              console.log(`✅ Successfully fetched a record from ${table}:`, data);
+            }
+          }
+        }
+      }
+      
+      // Check if auth.uid() matches frontend user.id
       const { data: authData, error: authError } = await supabase
         .rpc('get_auth_uid');
         
       if (authError) {
-        console.error("Failed to get auth.uid():", authError);
+        console.error("❌ Failed to get auth.uid():", authError);
       } else {
         console.log("Current auth.uid():", authData);
         console.log("Stored user.id:", user.id);
@@ -44,17 +84,21 @@ export function StoreInitializer() {
         
         if (authData !== user.id) {
           console.error("⚠️ CRITICAL ERROR: auth.uid() does not match user.id in frontend!");
+          toast({
+            title: "שגיאת זהות משתמש",
+            description: "התגלתה אי התאמה בין זהויות המשתמש. בדוק את יומן הלקוח לפרטים נוספים.",
+            variant: "destructive",
+          });
         }
       }
     } catch (e) {
-      console.error("Error checking RLS access:", e);
+      console.error("Error in detailed RLS access check:", e);
     }
   };
   
   // Initialize store with data from services
   useEffect(() => {
     // Only attempt to initialize when we have a definitive auth state
-    // This prevents trying to load when auth is still determining state
     if (isFirstLoad) {
       console.log("First load, checking auth state...");
       console.log("Auth state:", { user: !!user, session: !!session, isAuthenticated });
@@ -77,24 +121,49 @@ export function StoreInitializer() {
         console.log("Auth session present:", !!session);
         console.log("Session JWT:", session?.access_token ? "Present" : "Missing");
         
-        // Ensure supabase client has correct auth token before proceeding
-        if (!session?.access_token) {
-          throw new Error("No access token available for authenticated requests");
+        // Check RLS access before attempting to fetch data
+        await checkDetailedRlsAccess();
+        
+        // First load categories and payment sources with extra error handling
+        console.log("Fetching categories...");
+        try {
+          await fetchCategories();
+          console.log("Categories fetched successfully!");
+        } catch (categoryError) {
+          console.error("Error fetching categories:", categoryError);
+          toast({
+            title: "שגיאה בטעינת קטגוריות",
+            description: categoryError instanceof Error ? categoryError.message : "שגיאה לא ידועה",
+            variant: "destructive",
+          });
         }
         
-        // Check RLS access before attempting to fetch data
-        await checkRlsAccess();
-        
-        // First load categories and payment sources
-        console.log("Fetching categories...");
-        await fetchCategories();
-        
         console.log("Fetching payment sources...");
-        await fetchPaymentSources();
+        try {
+          await fetchPaymentSources();
+          console.log("Payment sources fetched successfully!");
+        } catch (sourceError) {
+          console.error("Error fetching payment sources:", sourceError);
+          toast({
+            title: "שגיאה בטעינת אמצעי תשלום",
+            description: sourceError instanceof Error ? sourceError.message : "שגיאה לא ידועה",
+            variant: "destructive",
+          });
+        }
         
-        // Then load expenses which might reference them
+        // Then load expenses
         console.log("Fetching expenses...");
-        await fetchExpenses();
+        try {
+          await fetchExpenses();
+          console.log("Expenses fetched successfully!");
+        } catch (expenseError) {
+          console.error("Error fetching expenses:", expenseError);
+          toast({
+            title: "שגיאה בטעינת הוצאות",
+            description: expenseError instanceof Error ? expenseError.message : "שגיאה לא ידועה",
+            variant: "destructive",
+          });
+        }
         
         setIsInitialized(true);
         console.log("Store initialization complete");
@@ -123,7 +192,6 @@ export function StoreInitializer() {
           errorMessage += " (ניסיון " + (initializationAttempts + 1) + ")";
         }
         
-        // Fix: Use object structure for toast instead of string
         toast({
           title: "שגיאה בטעינת נתונים",
           description: errorMessage,
