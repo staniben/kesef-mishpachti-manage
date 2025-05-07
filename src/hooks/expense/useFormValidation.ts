@@ -1,12 +1,14 @@
 
 import { ExpenseFormData } from "./expenseFormTypes";
 import { ExpenseCategory, PaymentSource } from "@/types/models";
-import { Toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
+
+export type ValidationToast = ReturnType<typeof useToast>['toast'];
 
 export function useFormValidation(
   categories: ExpenseCategory[],
   paymentSources: PaymentSource[],
-  toast: Toast
+  toast: ValidationToast
 ) {
   const validateAndPrepare = (formData: ExpenseFormData): boolean => {
     // Basic validation

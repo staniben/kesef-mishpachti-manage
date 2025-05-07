@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAppStore } from "@/store";
 import { exportToExcel } from "@/utils/exportUtils";
-import { filterExpensesByMonth } from "@/utils/expenseUtils";
+import { filterExpensesByMonth } from "@/utils/expense";
 
 export default function Dashboard() {
   const navigate = useNavigate();
