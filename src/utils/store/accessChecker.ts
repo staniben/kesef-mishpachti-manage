@@ -3,6 +3,21 @@ import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { TableName } from "@/types/supabase";
 
+// Define simplified error type to avoid recursion
+type SimplifiedError = {
+  code?: string;
+  message?: string;
+  details?: string;
+  hint?: string;
+};
+
+// Define simplified table result type
+type TableResult = {
+  success: boolean;
+  count?: number;
+  error?: SimplifiedError;
+};
+
 /**
  * Enhanced debug function to check RLS access
  */
@@ -26,7 +41,7 @@ export const checkDetailedRlsAccess = async (user: User | null, onError?: (messa
     
     // Test each table individually with detailed logging
     const tables: TableName[] = ['categories', 'expenses', 'payment_sources', 'profiles'];
-    const tableResults: Record<string, { success: boolean, count?: number, error?: any }> = {};
+    const tableResults: Record<string, TableResult> = {};
     
     let allSuccess = true;
     
@@ -42,7 +57,7 @@ export const checkDetailedRlsAccess = async (user: User | null, onError?: (messa
       const countError = countResult.error;
       const count = countResult.count ?? 0;
       
-      // Use a simpler type for the table results to avoid excessive recursion
+      // Use a simplified error object to avoid recursive type issues
       tableResults[table] = { 
         success: !countError, 
         count, 

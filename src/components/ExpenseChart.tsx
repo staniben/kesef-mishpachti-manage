@@ -30,6 +30,7 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ year, month }) => {
   const chartData = useMemo(() => {
     return Object.entries(groupedExpenses).map(([categoryId, expenses]) => {
       const category = categories.find((cat) => cat.id === categoryId);
+      // Fix: Directly calculate the total amount without chaining reduces
       const total = expenses.reduce((sum, expense) => sum + expense.amount, 0);
       return {
         name: category?.name || "Unknown",
