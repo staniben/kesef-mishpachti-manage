@@ -75,13 +75,40 @@ export const testRlsPolicy = async (
         
       case 'insert':
         // Only perform a dry run - immediately delete after insert
-        result = await supabase
-          .from(table)
-          .insert(testData)
-          .select()
-          .single();
+        // Fix: type specific insert for each table type
+        if (table === 'profiles') {
+          result = await supabase
+            .from(table)
+            .insert({ id: userData.user.id, email: 'test@example.com' })
+            .select()
+            .single();
+        } else if (table === 'categories') {
+          result = await supabase
+            .from(table)
+            .insert({ name: 'Test Category', user_id: userData.user.id })
+            .select()
+            .single();
+        } else if (table === 'payment_sources') {
+          result = await supabase
+            .from(table)
+            .insert({ name: 'Test Source', type: 'cash', user_id: userData.user.id })
+            .select()
+            .single();
+        } else if (table === 'expenses') {
+          result = await supabase
+            .from(table)
+            .insert({ 
+              title: 'Test Expense', 
+              amount: 100, 
+              date: new Date().toISOString(), 
+              payment_type: 'one-time',
+              user_id: userData.user.id 
+            })
+            .select()
+            .single();
+        }
           
-        if (!result.error) {
+        if (!result.error && result.data) {
           // Clean up - delete the test row
           await supabase
             .from(table)
@@ -91,20 +118,48 @@ export const testRlsPolicy = async (
         break;
         
       case 'update':
-        // First insert a test row
-        const insertResult = await supabase
-          .from(table)
-          .insert(testData)
-          .select()
-          .single();
+        // First insert a test row with type-specific data
+        let insertResult;
+        
+        if (table === 'profiles') {
+          insertResult = await supabase
+            .from(table)
+            .insert({ id: userData.user.id, email: 'test@example.com' })
+            .select()
+            .single();
+        } else if (table === 'categories') {
+          insertResult = await supabase
+            .from(table)
+            .insert({ name: 'Test Category', user_id: userData.user.id })
+            .select()
+            .single();
+        } else if (table === 'payment_sources') {
+          insertResult = await supabase
+            .from(table)
+            .insert({ name: 'Test Source', type: 'cash', user_id: userData.user.id })
+            .select()
+            .single();
+        } else if (table === 'expenses') {
+          insertResult = await supabase
+            .from(table)
+            .insert({ 
+              title: 'Test Expense', 
+              amount: 100, 
+              date: new Date().toISOString(), 
+              payment_type: 'one-time',
+              user_id: userData.user.id 
+            })
+            .select()
+            .single();
+        }
           
-        if (insertResult.error) {
+        if (!insertResult || insertResult.error) {
           return {
             operation,
             table,
             success: false,
-            error: insertResult.error,
-            message: `Failed to insert test row for update test: ${insertResult.error.message}`
+            error: insertResult?.error,
+            message: `Failed to insert test row for update test: ${insertResult?.error?.message || 'Unknown error'}`
           };
         }
         
@@ -125,20 +180,48 @@ export const testRlsPolicy = async (
         break;
         
       case 'delete':
-        // First insert a test row
-        const insertForDelete = await supabase
-          .from(table)
-          .insert(testData)
-          .select()
-          .single();
+        // First insert a test row with type-specific data
+        let insertForDelete;
+        
+        if (table === 'profiles') {
+          insertForDelete = await supabase
+            .from(table)
+            .insert({ id: userData.user.id + '-test', email: 'test-delete@example.com' })
+            .select()
+            .single();
+        } else if (table === 'categories') {
+          insertForDelete = await supabase
+            .from(table)
+            .insert({ name: 'Test Delete Category', user_id: userData.user.id })
+            .select()
+            .single();
+        } else if (table === 'payment_sources') {
+          insertForDelete = await supabase
+            .from(table)
+            .insert({ name: 'Test Delete Source', type: 'cash', user_id: userData.user.id })
+            .select()
+            .single();
+        } else if (table === 'expenses') {
+          insertForDelete = await supabase
+            .from(table)
+            .insert({ 
+              title: 'Test Delete Expense', 
+              amount: 100, 
+              date: new Date().toISOString(), 
+              payment_type: 'one-time',
+              user_id: userData.user.id 
+            })
+            .select()
+            .single();
+        }
           
-        if (insertForDelete.error) {
+        if (!insertForDelete || insertForDelete.error) {
           return {
             operation,
             table,
             success: false,
-            error: insertForDelete.error,
-            message: `Failed to insert test row for delete test: ${insertForDelete.error.message}`
+            error: insertForDelete?.error,
+            message: `Failed to insert test row for delete test: ${insertForDelete?.error?.message || 'Unknown error'}`
           };
         }
         
@@ -151,7 +234,7 @@ export const testRlsPolicy = async (
         break;
     }
     
-    if (result.error) {
+    if (result?.error) {
       return {
         operation,
         table,
@@ -166,7 +249,7 @@ export const testRlsPolicy = async (
       table,
       success: true,
       message: `RLS ${operation} policy working for ${table}`,
-      data: result.data
+      data: result?.data
     };
     
   } catch (error) {
