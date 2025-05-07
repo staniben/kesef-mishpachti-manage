@@ -57,13 +57,17 @@ export const checkDetailedRlsAccess = async (user: User | null, onError?: (messa
       const countError = countResult.error;
       const count = countResult.count ?? 0;
       
-      // Use a simplified error object to avoid recursive type issues
-      const simplifiedError = countError ? {
-        code: countError.code,
-        message: countError.message,
-        details: countError.details,
-        hint: countError.hint
-      } : undefined;
+      // Create simplified error object without deep recursion
+      let simplifiedError: SimplifiedError | undefined = undefined;
+      
+      if (countError) {
+        simplifiedError = {
+          code: countError.code,
+          message: countError.message,
+          details: countError.details,
+          hint: countError.hint
+        };
+      }
       
       tableResults[table] = { 
         success: !countError, 
