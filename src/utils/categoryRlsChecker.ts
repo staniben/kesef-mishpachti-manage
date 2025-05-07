@@ -33,9 +33,9 @@ export const useCategoryRlsChecker = () => {
       }
 
       // Test if RLS allows access to the categories count
-      const { data: countData, error: countError } = await supabase
+      const { count, error: countError } = await supabase
         .from('categories')
-        .select('count(*)', { count: 'exact', head: true })
+        .select('*', { count: 'exact', head: true })
         .eq('user_id', authData.user.id);
 
       if (countError) {
@@ -80,7 +80,7 @@ export const useCategoryRlsChecker = () => {
         return {
           authenticated: true,
           accessGranted: false,
-          categoriesCount: countData.count || 0,
+          categoriesCount: count || 0,
           userId: authData.user.id,
           message: `RLS allowed count but denied data access: ${categoriesError.message}`
         };

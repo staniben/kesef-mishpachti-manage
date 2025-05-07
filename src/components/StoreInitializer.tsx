@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { checkRlsAccess } from "@/integrations/supabase/client";
+import { TableName } from "@/types/supabase";
 
 export function StoreInitializer() {
   const { toast } = useToast();
@@ -33,16 +34,19 @@ export function StoreInitializer() {
       }
       
       // Test each table individually with detailed logging
-      const tables = ['categories', 'expenses', 'payment_sources', 'profiles'];
+      const tables: TableName[] = ['categories', 'expenses', 'payment_sources', 'profiles'];
       
       for (const table of tables) {
         console.log(`Testing RLS access for table: ${table}...`);
         
         // Test count access
-        const { count, error: countError } = await supabase
+        const countResult = await supabase
           .from(table)
           .select('*', { count: 'exact', head: true })
           .eq('user_id', user.id);
+          
+        const countError = countResult.error;
+        const count = countResult.count;
           
         if (countError) {
           console.error(`❌ RLS check for ${table} count failed:`, countError);
