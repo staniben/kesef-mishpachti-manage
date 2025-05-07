@@ -1,166 +1,147 @@
-
-import { 
-  Sidebar, 
-  SidebarContent, 
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarHeader,
-  SidebarFooter,
-  SidebarTrigger,
-  useSidebar
-} from "@/components/ui/sidebar";
-import { Link } from "react-router-dom";
-import { ChartPie, CreditCard, Plus, Settings, X } from "lucide-react";
-import { useRef, useEffect } from "react";
+import React, { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { Sidebar } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store";
-import { calculateTotalExpenses } from "@/utils/expenseUtils";
+import { LayoutDashboard, PlusCircle, Settings, Tags, Wallet } from "lucide-react";
+import { ThemeToggle } from "./ThemeToggle";
+import { GroupedList } from "./GroupedList";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/context/AuthContext";
+import { UserProfile } from "@/components/UserProfile";
+import { useMobile } from "@/hooks/use-mobile";
+import { calculateTotalExpenses, filterExpensesByMonth } from "@/utils/expense";
 
-export function AppSidebar() {
-  const { expenses, categories, paymentSources } = useAppStore();
-  const { openMobile, setOpenMobile, isMobile, open, setOpen } = useSidebar();
-  const sidebarRef = useRef<HTMLDivElement>(null);
-
-  // Handle clicks outside the sidebar to close it
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
-        // Close mobile sidebar when it's open
-        if (isMobile && openMobile) {
-          setOpenMobile(false);
-        }
-        // Close desktop sidebar when it's open (only in floating/offcanvas mode)
-        else if (!isMobile && open) {
-          setOpen(false);
-        }
-      }
-    }
-
-    // Only add the event listener when the sidebar is open
-    if ((isMobile && openMobile) || (!isMobile && open)) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [isMobile, openMobile, open, setOpenMobile, setOpen]);
-
-  // Handle menu item click to close the sidebar
-  const handleMenuItemClick = () => {
-    if (isMobile) {
-      setOpenMobile(false);
-    } else {
-      setOpen(false);
-    }
-  };
-
-  const menuItems = [
-    {
-      title: "דשבורד",
-      url: "/",
-      icon: ChartPie,
-    },
-    {
-      title: "הוסף הוצאה",
-      url: "/add-expense",
-      icon: Plus,
-    },
-    {
-      title: "קטגוריות",
-      url: "/categories",
-      icon: Category,
-    },
-    {
-      title: "אמצעי תשלום",
-      url: "/payment-sources",
-      icon: CreditCard,
-    },
-    {
-      title: "הגדרות",
-      url: "/settings",
-      icon: Settings,
-    },
-  ];
-
-  const totalExpenses = calculateTotalExpenses(expenses);
-
-  return (
-    <Sidebar variant="floating" collapsible="offcanvas" ref={sidebarRef}>
-      <SidebarHeader className="p-4 flex justify-between items-center">
-        <h2 className="text-lg font-bold">ניהול תקציב</h2>
-        <SidebarTrigger className="h-8 w-8">
-          <X className="h-5 w-5" />
-        </SidebarTrigger>
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <Link 
-                      to={item.url} 
-                      className="flex items-center gap-2"
-                      onClick={handleMenuItemClick}
-                    >
-                      <item.icon className="h-5 w-5" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel>סטטיסטיקה</SidebarGroupLabel>
-          <SidebarGroupContent className="p-3">
-            <div className="text-sm">
-              <div className="mb-2">
-                <span className="font-semibold">סה"כ הוצאות:</span> {totalExpenses.toLocaleString()} ₪
-              </div>
-              <div className="mb-2">
-                <span className="font-semibold">קטגוריות:</span> {categories.length}
-              </div>
-              <div>
-                <span className="font-semibold">אמצעי תשלום:</span> {paymentSources.length}
-              </div>
-            </div>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-      <SidebarFooter className="p-3 text-xs text-center">
-        ניהול תקציב משפחתי | גרסה 1.0
-      </SidebarFooter>
-    </Sidebar>
-  );
+interface NavItem {
+  title: string;
+  href: string;
+  icon: React.ReactNode;
 }
 
-// Custom Category icon component for RTL
-function Category(props: React.SVGProps<SVGSVGElement>) {
+const navItems: NavItem[] = [
+  {
+    title: "לוח בקרה",
+    href: "/",
+    icon: <LayoutDashboard size={20} />,
+  },
+  {
+    title: "הוספת הוצאה",
+    href: "/add-expense",
+    icon: <PlusCircle size={20} />,
+  },
+  {
+    title: "קטגוריות",
+    href: "/categories",
+    icon: <Tags size={20} />,
+  },
+  {
+    title: "אמצעי תשלום",
+    href: "/payment-sources",
+    icon: <Wallet size={20} />,
+  },
+  {
+    title: "הגדרות",
+    href: "/settings",
+    icon: <Settings size={20} />,
+  },
+];
+
+export function AppSidebar() {
+  const location = useLocation();
+  const { user, signOut } = useAuth();
+  const { expenses, categories } = useAppStore();
+  const [isExpanded, setIsExpanded] = useState(true);
+  const isMobile = useMobile();
+  
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+  const monthlyExpenses = filterExpensesByMonth(expenses, currentMonth, currentYear);
+  const totalExpenses = calculateTotalExpenses(monthlyExpenses);
+  
+  const groupedExpenses = React.useMemo(() => {
+    const grouped = categories.map((category) => {
+      const categoryExpenses = monthlyExpenses.filter(
+        (expense) => expense.categoryId === category.id
+      );
+      const categoryTotal = categoryExpenses.reduce(
+        (sum, expense) => sum + expense.amount,
+        0
+      );
+      return {
+        id: category.id,
+        label: category.name,
+        value: categoryTotal,
+        color: category.color,
+      };
+    });
+    
+    // Sort by value in descending order
+    grouped.sort((a, b) => b.value - a.value);
+    
+    return grouped;
+  }, [monthlyExpenses, categories]);
+  
   return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="3" y="3" width="7" height="7" rx="1" />
-      <rect x="14" y="3" width="7" height="7" rx="1" />
-      <rect x="3" y="14" width="7" height="7" rx="1" />
-      <rect x="14" y="14" width="7" height="7" rx="1" />
-    </svg>
+    <Sidebar className="w-60">
+      <div className="flex flex-col h-full">
+        <div className="px-4 py-6">
+          <Link to="/" className="flex items-center space-x-2">
+            <span className="font-bold">MoneyWise</span>
+          </Link>
+        </div>
+        
+        <Separator />
+        
+        <div className="flex-grow p-4">
+          <GroupedList
+            title="ניווט"
+            items={navItems.map((item) => ({
+              ...item,
+              active: location.pathname === item.href,
+              onClick: () => {},
+            }))}
+            renderItem={(item) => (
+              <Link to={item.href} className="w-full">
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "justify-start",
+                    item.active && "bg-secondary/50"
+                  )}
+                >
+                  {item.icon}
+                  <span>{item.title}</span>
+                </Button>
+              </Link>
+            )}
+          />
+          
+          <Separator className="my-4" />
+          
+          <GroupedList
+            title="הוצאות החודש"
+            items={groupedExpenses.map((item) => ({
+              ...item,
+              label: `${item.label} - ${item.value.toFixed(2)} ₪`,
+            }))}
+            renderItem={(item) => (
+              <div className="flex items-center justify-between w-full">
+                <span className="truncate">{item.label}</span>
+                <Badge variant="secondary">{item.value.toFixed(2)}</Badge>
+              </div>
+            )}
+          />
+        </div>
+        
+        <Separator />
+        
+        <div className="p-4 space-y-2">
+          <UserProfile user={user} onSignOut={signOut} />
+          <ThemeToggle />
+        </div>
+      </div>
+    </Sidebar>
   );
 }
