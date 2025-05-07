@@ -27,7 +27,6 @@ export function BasicExpenseFields({
   onSelectChange,
   disableAmount = false
 }: BasicExpenseFieldsProps) {
-   console.log("Categories in UI:", categories);
   return (
     <>
       <div className="space-y-2">
