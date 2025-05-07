@@ -41,7 +41,18 @@ export const checkDetailedRlsAccess = async (user: User | null, onError?: (messa
         
       const countError = countResult.error;
       const count = countResult.count ?? 0;
-      tableResults[table] = { success: !countError, count, error: countError };
+      
+      // Use a simpler type for the table results to avoid excessive recursion
+      tableResults[table] = { 
+        success: !countError, 
+        count, 
+        error: countError ? {
+          code: countError.code,
+          message: countError.message,
+          details: countError.details,
+          hint: countError.hint
+        } : undefined 
+      };
       
       if (countError) {
         allSuccess = false;

@@ -24,8 +24,8 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ year, month }) => {
   }, [expenses, year, month]);
 
   const groupedExpenses = useMemo(() => {
-    return groupExpensesByCategory(filteredExpenses, categories);
-  }, [filteredExpenses, categories]);
+    return groupExpensesByCategory(filteredExpenses);
+  }, [filteredExpenses]);
 
   const chartData = useMemo(() => {
     return Object.entries(groupedExpenses).map(([categoryId, expenses]) => {
