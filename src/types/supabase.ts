@@ -40,7 +40,7 @@ export interface DbPaymentSource {
   updated_at: string;
 }
 
-export type TableName = 'categories' | 'expenses' | 'payment_sources';
+export type TableName = 'categories' | 'expenses' | 'payment_sources' | 'profiles';
 
 // Adding RPC function return type definitions
 export interface RpcFunctionReturnTypes {
