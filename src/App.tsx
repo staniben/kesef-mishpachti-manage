@@ -27,6 +27,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <StoreInitializer />
           <Routes>
             {/* Auth routes (redirect to home if logged in) */}
             <Route element={<AuthRoute />}>

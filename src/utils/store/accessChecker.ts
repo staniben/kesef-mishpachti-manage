@@ -10,14 +10,15 @@ export const checkDetailedRlsAccess = async (user: User | null, onError?: (messa
   if (!user) return { success: false, message: "No authenticated user" };
   
   try {
-    // First use the built-in utility
-    const { data: rlsCheckResult, error: rlsCheckError } = await supabase.rpc('check_rls_access');
+    // First use the built-in utility to check basic auth functionality
+    // Note: We're using a specific RPC function that should exist in your Supabase project
+    const { data: rlsCheckResult, error: rlsCheckError } = await supabase.rpc('get_auth_uid');
     const success = !rlsCheckError && !!rlsCheckResult;
     
-    console.log("Basic RLS check result:", success ? "Success" : "Failed", rlsCheckError);
+    console.log("Basic auth check result:", success ? "Success" : "Failed", rlsCheckError);
     
     if (!success) {
-      const message = "Basic RLS check failed! This is likely preventing data access.";
+      const message = "Basic auth check failed! This is likely preventing data access.";
       console.error("❗ " + message);
       onError?.(message);
       return { success: false, message, error: rlsCheckError };

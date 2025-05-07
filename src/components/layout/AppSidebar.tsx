@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Sidebar } from "@/components/ui/sidebar";
@@ -11,7 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 import { UserProfile } from "@/components/UserProfile";
-import { useMobile } from "@/hooks/use-mobile";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { calculateTotalExpenses, filterExpensesByMonth } from "@/utils/expense";
 
 interface NavItem {
@@ -53,11 +54,11 @@ export function AppSidebar() {
   const { user, signOut } = useAuth();
   const { expenses, categories } = useAppStore();
   const [isExpanded, setIsExpanded] = useState(true);
-  const isMobile = useMobile();
+  const isMobile = useIsMobile();
   
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
-  const monthlyExpenses = filterExpensesByMonth(expenses, currentMonth, currentYear);
+  const monthlyExpenses = filterExpensesByMonth(expenses, currentYear, currentMonth);
   const totalExpenses = calculateTotalExpenses(monthlyExpenses);
   
   const groupedExpenses = React.useMemo(() => {
@@ -99,6 +100,8 @@ export function AppSidebar() {
             title="ניווט"
             items={navItems.map((item) => ({
               ...item,
+              id: item.href,
+              label: item.title,
               active: location.pathname === item.href,
               onClick: () => {},
             }))}
@@ -138,7 +141,7 @@ export function AppSidebar() {
         <Separator />
         
         <div className="p-4 space-y-2">
-          <UserProfile user={user} onSignOut={signOut} />
+          <UserProfile />
           <ThemeToggle />
         </div>
       </div>

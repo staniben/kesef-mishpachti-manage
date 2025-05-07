@@ -1,9 +1,10 @@
-import React from "react";
+
+import React, { useMemo } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Expense, ExpenseCategory } from "@/types/models";
 import { useAppStore } from "@/store";
 import { Card, CardContent } from "./ui/card";
-import { groupExpensesByCategory, sortExpensesByDate, filterExpensesByMonth } from "@/utils/expense";
+import { filterExpensesByMonth, groupExpensesByCategory } from "@/utils/expense";
 
 interface ExpenseChartProps {
   year?: number;

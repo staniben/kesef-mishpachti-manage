@@ -54,7 +54,12 @@ export const useRlsChecker = () => {
         table,
         totalTests: results.length,
         passedTests: results.filter(r => r.success).length,
-        operations: {}
+        operations: {
+          select: false,
+          insert: false,
+          update: false,
+          delete: false
+        }
       };
       
       // Populate operation results

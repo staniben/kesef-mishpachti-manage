@@ -1,3 +1,4 @@
+
 import React, { useMemo } from "react";
 import { formatDate } from "@/lib/utils";
 import { useAppStore } from "@/store";
@@ -8,9 +9,12 @@ import { filterExpensesByMonth, sortExpensesByDate } from "@/utils/expense";
 
 interface ExpensesListProps {
   categoryId?: string;
+  filterId?: string;
+  filterType?: "category" | "source";
+  onEditExpense?: (id: string) => void;
 }
 
-export function ExpensesList({ categoryId }: ExpensesListProps) {
+export function ExpensesList({ categoryId, filterId, filterType, onEditExpense }: ExpensesListProps) {
   const currentMonth = useAppStore((state) => state.currentMonth);
   const currentYear = useAppStore((state) => state.currentYear);
   const expenses = useAppStore((state) => state.expenses);
@@ -18,14 +22,22 @@ export function ExpensesList({ categoryId }: ExpensesListProps) {
   const paymentSources = useAppStore((state) => state.paymentSources);
 
   const filteredExpenses = useMemo(() => {
-    let monthlyExpenses = filterExpensesByMonth(expenses, currentMonth, currentYear);
+    let monthlyExpenses = filterExpensesByMonth(expenses, currentYear, currentMonth);
 
     if (categoryId) {
       monthlyExpenses = monthlyExpenses.filter((expense) => expense.categoryId === categoryId);
     }
+    
+    if (filterId && filterType) {
+      if (filterType === "category") {
+        monthlyExpenses = monthlyExpenses.filter((expense) => expense.categoryId === filterId);
+      } else if (filterType === "source") {
+        monthlyExpenses = monthlyExpenses.filter((expense) => expense.paymentSourceId === filterId);
+      }
+    }
 
     return sortExpensesByDate(monthlyExpenses);
-  }, [expenses, currentMonth, currentYear, categoryId]);
+  }, [expenses, currentMonth, currentYear, categoryId, filterId, filterType]);
 
   if (!filteredExpenses || filteredExpenses.length === 0) {
     return (

@@ -64,9 +64,10 @@ export const testRlsPolicy = async (
         break;
         
       case 'insert':
+        // Type cast testData to "any" to avoid TypeScript errors with generic table operations
         const { data: insertData, error: insertError } = await supabase
           .from(table)
-          .insert(testData)
+          .insert(testData as any)
           .select();
           
         result.success = !insertError;
@@ -87,7 +88,7 @@ export const testRlsPolicy = async (
         // First insert test data
         const { data: preData, error: preError } = await supabase
           .from(table)
-          .insert(testData)
+          .insert(testData as any)
           .select();
           
         if (preError || !preData || preData.length === 0) {
@@ -121,7 +122,7 @@ export const testRlsPolicy = async (
         // First insert test data
         const { data: deleteTestData, error: deleteTestError } = await supabase
           .from(table)
-          .insert(testData)
+          .insert(testData as any)
           .select();
           
         if (deleteTestError || !deleteTestData || deleteTestData.length === 0) {

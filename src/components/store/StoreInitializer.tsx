@@ -50,7 +50,7 @@ export function StoreInitializer() {
           toast({
             title: "שגיאת אימות",
             description: "פג תוקף האימות או שהוא יפוג בקרוב, יתכן שתתבקש להתחבר מחדש",
-            variant: "warning",
+            variant: "destructive",
           });
         }
         
