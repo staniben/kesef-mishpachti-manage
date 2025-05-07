@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { checkRlsAccess } from "@/integrations/supabase/client";
 import { TableName } from "@/types/supabase";
+import { checkUserAccess } from "@/utils/rls/rlsTestUtils";
 
 export function StoreInitializer() {
   const { toast } = useToast();
