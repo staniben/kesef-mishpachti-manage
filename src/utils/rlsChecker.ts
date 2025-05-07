@@ -13,6 +13,16 @@ interface RlsTestResult {
   success: boolean;
   error?: any;
   message: string;
+  data?: any;
+}
+
+interface RlsSummary {
+  table: TableName;
+  totalTests: number;
+  passedTests: number;
+  operations: {
+    [key in RlsOperation]?: boolean;
+  };
 }
 
 /**
@@ -113,6 +123,24 @@ export const testRlsPolicy = async (
           .from(table)
           .select('count(*)', { count: 'exact', head: true })
           .eq('user_id', userData.user.id);
+          
+        if (!result.error) {
+          // Also try to fetch a specific record
+          const detailQuery = await supabase
+            .from(table)
+            .select('*')
+            .eq('user_id', userData.user.id)
+            .limit(1);
+            
+          if (detailQuery.error) {
+            result = detailQuery;
+          } else {
+            result.data = {
+              count: result.count,
+              sample: detailQuery.data && detailQuery.data.length > 0 ? detailQuery.data[0] : null
+            };
+          }
+        }
         break;
         
       case 'insert':
@@ -207,7 +235,8 @@ export const testRlsPolicy = async (
       operation,
       table,
       success: true,
-      message: `RLS ${operation} policy working for ${table}`
+      message: `RLS ${operation} policy working for ${table}`,
+      data: result.data
     };
     
   } catch (error) {
@@ -259,5 +288,94 @@ export const useRlsChecker = () => {
     return results;
   };
   
-  return { testRlsPolicy, testAllPolicies };
+  /**
+   * Tests all RLS policies for all tables
+   */
+  const testAllTables = async (): Promise<RlsSummary[]> => {
+    const tables: TableName[] = ['categories', 'expenses', 'payment_sources'];
+    const summaries: RlsSummary[] = [];
+    
+    for (const table of tables) {
+      const results = await testAllPolicies(table);
+      const summary: RlsSummary = {
+        table,
+        totalTests: results.length,
+        passedTests: results.filter(r => r.success).length,
+        operations: {}
+      };
+      
+      // Populate operation results
+      for (const result of results) {
+        summary.operations[result.operation] = result.success;
+      }
+      
+      summaries.push(summary);
+    }
+    
+    // Show overall summary
+    const totalTests = summaries.reduce((sum, s) => sum + s.totalTests, 0);
+    const passedTests = summaries.reduce((sum, s) => sum + s.passedTests, 0);
+    
+    toast({
+      title: "RLS Policy Test Complete",
+      description: `${passedTests} of ${totalTests} tests passed across all tables`,
+      variant: passedTests === totalTests ? "default" : "destructive",
+    });
+    
+    return summaries;
+  };
+  
+  /**
+   * Check if user has appropriate RLS access to create items
+   */
+  const checkUserAccess = async (): Promise<{
+    hasAccess: boolean;
+    userId?: string | null;
+    authUid?: string | null;
+    message: string;
+  }> => {
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      
+      if (!authData?.user) {
+        return {
+          hasAccess: false,
+          message: "No authenticated user found. Please log in first."
+        };
+      }
+      
+      // Test RLS access by trying to query categories
+      const { data, error } = await supabase
+        .from('categories')
+        .select('count(*)', { count: 'exact', head: true })
+        .eq('user_id', authData.user.id);
+        
+      if (error) {
+        // Check auth.uid() to see if it matches
+        const { data: authUid, error: authError } = await supabase
+          .rpc('get_auth_uid');
+        
+        return {
+          hasAccess: false,
+          userId: authData.user.id,
+          authUid: authError ? null : authUid,
+          message: `RLS policy access failed: ${error.message}. Auth UID match: ${!authError && (authUid === authData.user.id)}`
+        };
+      }
+      
+      return {
+        hasAccess: true,
+        userId: authData.user.id,
+        message: "User has proper RLS access"
+      };
+    } catch (error) {
+      console.error("Error checking user access:", error);
+      return {
+        hasAccess: false,
+        message: `Error checking access: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
+    }
+  };
+  
+  return { testRlsPolicy, testAllPolicies, testAllTables, checkUserAccess };
 };
