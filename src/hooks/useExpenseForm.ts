@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -19,12 +18,31 @@ export function useExpenseForm(editId?: string) {
     expenses, 
     addExpense, 
     updateExpense, 
-    addMultipleExpenses 
+    addMultipleExpenses,
+    fetchCategories,
+    fetchPaymentSources
   } = useAppStore();
   
   const { handleSingleExpense } = useSingleExpenseHandler();
   const { handleInstallmentExpense } = useInstallmentExpenseHandler();
   const { handleRecurringExpense } = useRecurringExpenseHandler();
+  
+  // Add debug logging for categories and paymentSources
+  useEffect(() => {
+    console.log("ExpenseForm hook - categories:", categories.length);
+    console.log("ExpenseForm hook - paymentSources:", paymentSources.length);
+    
+    // If no data is available, try fetching again
+    if (categories.length === 0) {
+      console.log("No categories available in useExpenseForm, fetching...");
+      fetchCategories().catch(err => console.error("Error fetching categories in hook:", err));
+    }
+    
+    if (paymentSources.length === 0) {
+      console.log("No payment sources available in useExpenseForm, fetching...");
+      fetchPaymentSources().catch(err => console.error("Error fetching payment sources in hook:", err));
+    }
+  }, [categories, paymentSources, fetchCategories, fetchPaymentSources]);
   
   const [formData, setFormData] = useState<ExpenseFormData>({
     id: "",
