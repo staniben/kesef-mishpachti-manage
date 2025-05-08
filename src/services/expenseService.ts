@@ -1,7 +1,7 @@
 import { Expense } from '@/types/models';
 import { supabase } from '@/integrations/supabase/client';
 import { generateId } from './mockData';
-import { mapDbExpenseToModel, mapModelToDbExpense } from '@/utils/dataMappers';
+import { mapDbExpenseToModel as mapDbToModel, mapModelToDbExpense as mapModelToDb } from '@/utils/dataMappers';
 
 // Helper function to map Supabase DB schema to our frontend model
 const mapDbExpenseToModel = (dbExpense: any): Expense => ({
@@ -37,7 +37,7 @@ const validateExpenseForDB = (expense: Expense): string | null => {
 };
 
 // Helper function to map frontend model to Supabase DB schema
-const mapModelToDbExpense = (expense: Expense, userId: string) => {
+const mapModelToDb = (expense: Expense, userId: string) => {
   // Create a database-compatible object
   const dbExpense = {
     id: expense.id,
@@ -120,7 +120,7 @@ export const expenseService = {
     }
 
     console.log('Successfully fetched expenses:', data?.length || 0);
-    return data ? data.map(mapDbExpenseToModel) : [];
+    return data ? data.map(mapDbToModel) : [];
   },
 
   getById: async (id: string): Promise<Expense | null> => {
@@ -143,7 +143,7 @@ export const expenseService = {
       throw error;
     }
 
-    return data ? mapDbExpenseToModel(data) : null;
+    return data ? mapDbToModel(data) : null;
   },
 
   getByMonth: async (month: number, year: number): Promise<Expense[]> => {
@@ -170,7 +170,7 @@ export const expenseService = {
       throw error;
     }
 
-    return data ? data.map(mapDbExpenseToModel) : [];
+    return data ? data.map(mapDbToModel) : [];
   },
   
   getByCategory: async (categoryId: string): Promise<Expense[]> => {
@@ -192,7 +192,7 @@ export const expenseService = {
       throw error;
     }
 
-    return data ? data.map(mapDbExpenseToModel) : [];
+    return data ? data.map(mapDbToModel) : [];
   },
   
   getByPaymentSource: async (sourceId: string): Promise<Expense[]> => {
@@ -214,7 +214,7 @@ export const expenseService = {
       throw error;
     }
 
-    return data ? data.map(mapDbExpenseToModel) : [];
+    return data ? data.map(mapDbToModel) : [];
   },
 
   create: async (expense: Expense): Promise<Expense> => {
@@ -247,7 +247,7 @@ export const expenseService = {
       }
       
       // Use the mapper function to convert our model to DB schema
-      const dbExpense = mapModelToDbExpense(
+      const dbExpense = mapModelToDb(
         {
           ...expense,
           id: expense.id || generateId(),
@@ -287,7 +287,7 @@ export const expenseService = {
       }
 
       console.log('Expense created successfully:', data);
-      return mapDbExpenseToModel(data);
+      return mapDbToModel(data);
     } catch (error) {
       console.error('Failed to create expense:', error);
       throw error;
@@ -323,7 +323,7 @@ export const expenseService = {
       
       // Use the mapper function to convert our models to DB schema
       const dbExpenses = newExpenses.map(expense => {
-        return mapModelToDbExpense({
+        return mapModelToDb({
           ...expense,
           id: expense.id || generateId(),
         }, userData.user.id);
@@ -349,7 +349,7 @@ export const expenseService = {
       }
 
       console.log('Batch expenses created successfully:', data);
-      return data ? data.map(mapDbExpenseToModel) : [];
+      return data ? data.map(mapDbToModel) : [];
     } catch (error) {
       console.error('Failed to create batch expenses:', error);
       throw error;
@@ -411,7 +411,7 @@ export const expenseService = {
       }
 
       console.log('Expense updated successfully:', data);
-      return mapDbExpenseToModel(data);
+      return mapDbToModel(data);
     } catch (error) {
       console.error(`Failed to update expense ${id}:`, error);
       throw error;

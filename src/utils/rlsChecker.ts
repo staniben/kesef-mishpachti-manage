@@ -39,6 +39,7 @@ const createExpenseTestRecord = (userId: string): Omit<DbExpense, 'id'> => {
     title: `Test Expense ${testId.substring(0, 8)}`,
     amount: 100,
     date: now,
+    time: null,
     payment_type: 'one-time',
     user_id: userId,
     category_id: null,
@@ -46,8 +47,11 @@ const createExpenseTestRecord = (userId: string): Omit<DbExpense, 'id'> => {
     recurring: false,
     recurring_interval: null,
     recurring_end_date: null,
+    recurrence_id: null,
+    related_expense_id: null,
     installment: false,
     installment_count: null,
+    total_installments: null,
     created_at: now,
     updated_at: now
   };
