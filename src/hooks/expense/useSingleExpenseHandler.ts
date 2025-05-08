@@ -4,6 +4,7 @@ import { createBaseExpense } from "@/utils/expenseUtils";
 import { ExpenseFormData } from "./expenseFormTypes";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext"; // Import useAuth
+import { checkRlsAccess } from "@/integrations/supabase/client";
 
 export function useSingleExpenseHandler() {
   const { toast } = useToast();
@@ -12,6 +13,13 @@ export function useSingleExpenseHandler() {
   const handleSingleExpense = (formData: ExpenseFormData, editId?: string) => {
     console.log("Single expense handler called with user:", user?.id);
     console.log("Form data:", formData);
+    
+    // First, test RLS access to help debug issues
+    checkRlsAccess().then(result => {
+      console.log("RLS access check result:", result);
+    }).catch(err => {
+      console.error("RLS access check failed:", err);
+    });
     
     const totalAmount = parseFloat(formData.amount);
     if (isNaN(totalAmount) || totalAmount <= 0) {

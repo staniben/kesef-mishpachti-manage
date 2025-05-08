@@ -2,15 +2,47 @@
 import { useEffect, useState } from "react";
 import { ExpenseForm } from "@/components/ExpenseForm";
 import { useAppStore } from "@/store";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { checkRlsAccess } from "@/integrations/supabase/client";
 
 export default function AddExpense() {
   const { categories, paymentSources, fetchCategories, fetchPaymentSources } = useAppStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user, isAuthenticated } = useAuth();
+  const [rlsStatus, setRlsStatus] = useState<string>('checking');
+
+  // Check RLS policies on component mount
+  useEffect(() => {
+    const checkAccess = async () => {
+      if (!user) {
+        setRlsStatus('no-user');
+        return;
+      }
+      
+      try {
+        const result = await checkRlsAccess();
+        if (result.success) {
+          if (result.match) {
+            setRlsStatus('ok');
+          } else {
+            setRlsStatus('mismatch');
+          }
+          console.log("RLS access check result:", result);
+        } else {
+          setRlsStatus('failed');
+          console.error("RLS access check failed:", result.error);
+        }
+      } catch (error) {
+        setRlsStatus('error');
+        console.error("Error checking RLS access:", error);
+      }
+    };
+    
+    checkAccess();
+  }, [user]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -73,6 +105,20 @@ export default function AddExpense() {
         <Alert variant="destructive">
           <AlertTitle>שגיאה</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      
+      {rlsStatus !== 'ok' && (
+        <Alert variant="warning" className="bg-amber-50 border-amber-400">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertTitle>בדיקת מדיניות אבטחה (RLS)</AlertTitle>
+          <AlertDescription>
+            {rlsStatus === 'checking' && 'בודק הרשאות גישה...'}
+            {rlsStatus === 'no-user' && 'יש להתחבר למערכת כדי לבדוק הרשאות'}
+            {rlsStatus === 'mismatch' && 'זוהה חוסר התאמה בין זיהוי המשתמש למערכת ההרשאות'}
+            {rlsStatus === 'failed' && 'בדיקת הרשאות נכשלה - ייתכן שאין מדיניויות RLS מוגדרות'}
+            {rlsStatus === 'error' && 'אירעה שגיאה בבדיקת הרשאות'}
+          </AlertDescription>
         </Alert>
       )}
       

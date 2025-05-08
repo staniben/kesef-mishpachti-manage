@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useAppStore } from "@/store";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, checkRlsAccess } from "@/integrations/supabase/client";
 
 export function StoreInitializer() {
   const { toast } = useToast();
@@ -13,25 +13,56 @@ export function StoreInitializer() {
   const [isFirstLoad, setIsFirstLoad] = useState(true);
   const [initializationAttempts, setInitializationAttempts] = useState(0);
   
-  // Debug function to check RLS access
-  const checkRlsAccess = async () => {
+  // Debug function to check RLS access with more detailed information
+  const checkDetailedRlsAccess = async () => {
     if (!user) return;
     
     try {
-      // Try a simple select query to check if RLS is allowing access
-      console.log("Testing RLS for categories...");
-      const { data: catData, error: catError } = await supabase
-        .from('categories')
+      console.log("Testing RLS for expenses table specifically...");
+      const { data: expData, error: expError } = await supabase
+        .from('expenses')
         .select('count(*)', { count: 'exact', head: true });
       
-      if (catError) {
-        console.error("RLS check for categories failed:", catError);
+      if (expError) {
+        console.error("RLS check for expenses failed:", expError);
+        console.error("Error code:", expError.code);
+        console.error("Error message:", expError.message);
+        console.error("Error details:", expError.details);
       } else {
-        console.log("RLS check for categories passed! Access granted.");
+        console.log("RLS check for expenses passed! Access granted.");
       }
       
-      // Check if user_id is being properly recognized
-      console.log("Testing auth.uid() in RLS...");
+      // Test insert capability
+      console.log("Testing INSERT capability for expenses...");
+      const testId = `test-${Date.now()}`;
+      const { error: insertError } = await supabase
+        .from('expenses')
+        .insert({
+          id: testId,
+          title: 'Test Expense',
+          amount: 100,
+          date: new Date().toISOString(),
+          payment_type: 'one-time',
+          user_id: user.id
+        })
+        .select();
+      
+      if (insertError) {
+        console.error("INSERT test failed:", insertError);
+        console.error("Error code:", insertError.code);
+        console.error("Error message:", insertError.message);
+        console.error("Error details:", insertError.details);
+        
+        if (insertError.message.includes("policy")) {
+          console.error("This appears to be an RLS policy violation");
+        }
+      } else {
+        console.log("INSERT test successful!");
+        // Clean up test data
+        await supabase.from('expenses').delete().eq('id', testId);
+      }
+      
+      // Check user_id vs auth.uid()
       const { data: authData, error: authError } = await supabase
         .rpc('get_auth_uid');
         
@@ -83,7 +114,7 @@ export function StoreInitializer() {
         }
         
         // Check RLS access before attempting to fetch data
-        await checkRlsAccess();
+        await checkDetailedRlsAccess();
         
         // First load categories and payment sources
         console.log("Fetching categories...");

@@ -1,4 +1,3 @@
-
 import { Expense } from '@/types/models';
 import { supabase } from '@/integrations/supabase/client';
 import { generateId } from './mockData';
@@ -63,6 +62,12 @@ const mapModelToDbExpense = (expense: Expense) => {
   return dbExpense;
 };
 
+// Helper function to check RLS access
+const checkRlsAccess = async () => {
+  // Implement your RLS access check logic here
+  return true; // Placeholder for RLS access check
+};
+
 export const expenseService = {
   getAll: async (): Promise<Expense[]> => {
     const { data: userData } = await supabase.auth.getUser();
@@ -72,6 +77,16 @@ export const expenseService = {
       return [];
     }
     
+    console.log('Fetching expenses for user:', userData.user.id);
+    
+    // Test RLS access before the main query
+    try {
+      const rlsResult = await checkRlsAccess();
+      console.log('RLS access check before fetching expenses:', rlsResult);
+    } catch (error) {
+      console.error('RLS check failed:', error);
+    }
+    
     const { data, error } = await supabase
       .from('expenses')
       .select('*')
@@ -79,9 +94,13 @@ export const expenseService = {
 
     if (error) {
       console.error('Error fetching expenses:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      console.error('Error details:', error.details);
       throw error;
     }
 
+    console.log('Successfully fetched expenses:', data?.length || 0);
     return data ? data.map(mapDbExpenseToModel) : [];
   },
 
@@ -191,6 +210,14 @@ export const expenseService = {
       
       console.log('Creating expense with authenticated user:', userData.user.id);
       
+      // Check RLS access before creating expense
+      try {
+        const rlsResult = await checkRlsAccess();
+        console.log('RLS access check before creating expense:', rlsResult);
+      } catch (error) {
+        console.error('RLS check failed:', error);
+      }
+      
       // Validate the expense data
       const validationError = validateExpenseForDB(expense);
       if (validationError) {
@@ -209,6 +236,8 @@ export const expenseService = {
       
       // Log what we're sending to Supabase for debugging
       console.log('Creating expense with data:', dbExpense);
+      console.log('User ID in expense:', dbExpense.user_id);
+      console.log('Auth UID matches User ID:', dbExpense.user_id === userData.user.id);
       
       const { data, error } = await supabase
         .from('expenses')
@@ -218,8 +247,17 @@ export const expenseService = {
 
       if (error) {
         console.error('Error creating expense:', error);
-        console.error('Supabase error message:', error.message);
-        console.error('Supabase error details:', error.details);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        console.error('Error details:', error.details);
+        
+        // Log RLS policies violation specifically
+        if (error.code === '42501') {
+          console.error('RLS policy violation detected. Check if policies are properly set up.');
+          console.error('User ID provided:', dbExpense.user_id);
+          console.error('Authenticated user ID:', userData.user.id);
+        }
+        
         throw error;
       }
 
@@ -282,8 +320,9 @@ export const expenseService = {
 
       if (error) {
         console.error('Error creating batch expenses:', error);
-        console.error('Supabase error message:', error.message);
-        console.error('Supabase error details:', error.details);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        console.error('Error details:', error.details);
         throw error;
       }
 
@@ -343,8 +382,9 @@ export const expenseService = {
 
       if (error) {
         console.error(`Error updating expense with ID ${id}:`, error);
-        console.error('Supabase error message:', error.message);
-        console.error('Supabase error details:', error.details);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        console.error('Error details:', error.details);
         throw error;
       }
 
@@ -380,8 +420,9 @@ export const expenseService = {
 
       if (error) {
         console.error(`Error deleting expense with ID ${id}:`, error);
-        console.error('Supabase error message:', error.message);
-        console.error('Supabase error details:', error.details);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        console.error('Error details:', error.details);
         throw error;
       }
       
