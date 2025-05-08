@@ -52,27 +52,27 @@ export const checkRlsAccess = async () => {
     console.log("Authenticated user:", userData.user.id);
     
     // Test multiple tables to find which one might be causing issues
-    const tables = ['categories', 'expenses', 'payment_sources'];
+    const tableNames = ['categories', 'expenses', 'payment_sources'] as const;
     const results: Record<string, any> = {};
     
-    for (const table of tables) {
-      console.log(`Testing RLS access for ${table}...`);
+    for (const tableName of tableNames) {
+      console.log(`Testing RLS access for ${tableName}...`);
       
       try {
-        const { data, error } = await supabase
-          .from(table)
-          .select('count(*)', { count: 'exact', head: true });
+        const { data, error, count } = await supabase
+          .from(tableName)
+          .select('*', { count: 'exact', head: true });
           
         if (error) {
-          console.error(`RLS check for ${table} failed:`, error);
-          results[table] = { success: false, error };
+          console.error(`RLS check for ${tableName} failed:`, error);
+          results[tableName] = { success: false, error };
         } else {
-          console.log(`RLS check for ${table} passed! Count:`, data?.count);
-          results[table] = { success: true, count: data?.count };
+          console.log(`RLS check for ${tableName} passed! Count:`, count);
+          results[tableName] = { success: true, count };
         }
       } catch (e) {
-        console.error(`Error checking RLS for ${table}:`, e);
-        results[table] = { success: false, error: e };
+        console.error(`Error checking RLS for ${tableName}:`, e);
+        results[tableName] = { success: false, error: e };
       }
     }
     
@@ -133,7 +133,7 @@ export const checkRlsAccess = async () => {
     }
     
     // Determine overall success status
-    const allTablesSuccess = tables.every(table => results[table]?.success);
+    const allTablesSuccess = tableNames.every(table => results[table]?.success);
     const authUidSuccess = results['auth_uid']?.success;
     const insertSuccess = results['insert_test']?.success;
     
