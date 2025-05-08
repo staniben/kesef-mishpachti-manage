@@ -1,7 +1,9 @@
+
 import { Expense } from '@/types/models';
 import { supabase } from '@/integrations/supabase/client';
 import { generateId } from './mockData';
 import { mapDbExpenseToModel as mapDbToModel, mapModelToDbExpense as mapModelToDb } from '@/utils/dataMappers';
+import { DbExpense } from '@/types/supabase';
 
 // Validate expense data before it's sent to the database
 const validateExpenseForDB = (expense: Expense): string | null => {
@@ -206,14 +208,25 @@ export const expenseService = {
         userData.user.id
       );
       
+      // Cast the partial DbExpense to a complete type for insert
+      // We've validated that all required fields are present
+      const insertableExpense = {
+        ...dbExpense,
+        amount: Number(expense.amount), // Ensure amount is provided as required
+        date: expense.date,             // Ensure date is provided as required
+        title: expense.name,            // Ensure title is provided as required
+        payment_type: expense.paymentType, // Ensure payment_type is provided as required
+        user_id: userData.user.id       // Ensure user_id is provided as required
+      } as Database['public']['Tables']['expenses']['Insert'];
+      
       // Log what we're sending to Supabase for debugging
-      console.log('Creating expense with data:', dbExpense);
-      console.log('User ID in expense:', dbExpense.user_id);
-      console.log('Auth UID matches User ID:', dbExpense.user_id === userData.user.id);
+      console.log('Creating expense with data:', insertableExpense);
+      console.log('User ID in expense:', insertableExpense.user_id);
+      console.log('Auth UID matches User ID:', insertableExpense.user_id === userData.user.id);
       
       const { data, error } = await supabase
         .from('expenses')
-        .insert(dbExpense)
+        .insert(insertableExpense)
         .select()
         .single();
 
@@ -226,7 +239,7 @@ export const expenseService = {
         // Log RLS policies violation specifically
         if (error.code === '42501') {
           console.error('RLS policy violation detected. Check if policies are properly set up.');
-          console.error('User ID provided:', dbExpense.user_id);
+          console.error('User ID provided:', insertableExpense.user_id);
           console.error('Authenticated user ID:', userData.user.id);
         }
         
@@ -274,10 +287,20 @@ export const expenseService = {
       
       // Use the mapper function to convert our models to DB schema
       const dbExpenses = newExpenses.map(expense => {
-        return mapModelToDb({
+        const mappedExpense = mapModelToDb({
           ...expense,
           id: expense.id || generateId(),
         }, userData.user.id);
+        
+        // Add required fields to ensure each expense meets the DB requirements
+        return {
+          ...mappedExpense,
+          amount: Number(expense.amount),
+          date: expense.date,
+          title: expense.name,
+          payment_type: expense.paymentType,
+          user_id: userData.user.id
+        } as Database['public']['Tables']['expenses']['Insert'];
       });
       
       console.log('Creating batch expenses:', dbExpenses);
@@ -402,3 +425,6 @@ export const expenseService = {
     }
   }
 };
+
+// Import type for type assertion
+import type { Database } from '@/integrations/supabase/types';
