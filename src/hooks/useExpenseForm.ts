@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -9,10 +8,12 @@ import { useSingleExpenseHandler } from "./expense/useSingleExpenseHandler";
 import { useInstallmentExpenseHandler } from "./expense/useInstallmentExpenseHandler";
 import { useRecurringExpenseHandler } from "./expense/useRecurringExpenseHandler";
 import { useAppStore } from "@/store";
+import { useAuth } from "@/context/AuthContext";
 
 export function useExpenseForm(editId?: string) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const { 
     categories, 
     paymentSources, 
@@ -63,6 +64,27 @@ export function useExpenseForm(editId?: string) {
       }
     }
   }, [editId, expenses]);
+
+  // Effect to log initial data for debugging
+  useEffect(() => {
+    console.log("ExpenseForm initialized with user:", user?.id);
+    console.log("Available categories:", categories);
+    console.log("Available payment sources:", paymentSources);
+    console.log("Initial form data:", formData);
+  }, []);
+  
+  // Effect to update form data when categories or payment sources change
+  useEffect(() => {
+    if (categories.length > 0 && !formData.categoryId) {
+      setFormData(prev => ({ ...prev, categoryId: categories[0].id }));
+      console.log("Updated form with first category:", categories[0].id);
+    }
+    
+    if (paymentSources.length > 0 && !formData.paymentSourceId) {
+      setFormData(prev => ({ ...prev, paymentSourceId: paymentSources[0].id }));
+      console.log("Updated form with first payment source:", paymentSources[0].id);
+    }
+  }, [categories, paymentSources, formData.categoryId, formData.paymentSourceId]);
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -87,6 +109,18 @@ export function useExpenseForm(editId?: string) {
   
   const validateAndPrepare = () => {
     // Basic validation
+    console.log("Validating form data:", formData);
+    console.log("User authenticated:", !!user);
+    
+    if (!user) {
+      toast({
+        title: "שגיאת אימות",
+        description: "יש להתחבר למערכת כדי להוסיף הוצאה",
+        variant: "destructive",
+      });
+      return false;
+    }
+    
     if (!formData.date || ((formData.paymentType === "installment" || formData.paymentType === "recurring") && !formData.startDate)) {
       toast({
         title: "שגיאה",
@@ -97,8 +131,18 @@ export function useExpenseForm(editId?: string) {
     }
     
     // Validate category exists
+    if (!formData.categoryId) {
+      toast({
+        title: "שגיאה",
+        description: "יש לבחור קטגוריה",
+        variant: "destructive",
+      });
+      return false;
+    }
+    
     if (formData.categoryId && categories.length > 0) {
       const categoryExists = categories.some(c => c.id === formData.categoryId);
+      console.log("Category validation:", { categoryId: formData.categoryId, exists: categoryExists, categories: categories.map(c => c.id) });
       if (!categoryExists) {
         toast({
           title: "שגיאה",
@@ -110,8 +154,18 @@ export function useExpenseForm(editId?: string) {
     }
     
     // Validate payment source exists
+    if (!formData.paymentSourceId) {
+      toast({
+        title: "שגיאה",
+        description: "יש לבחור אמצעי תשלום",
+        variant: "destructive",
+      });
+      return false;
+    }
+    
     if (formData.paymentSourceId && paymentSources.length > 0) {
       const sourceExists = paymentSources.some(s => s.id === formData.paymentSourceId);
+      console.log("Payment source validation:", { sourceId: formData.paymentSourceId, exists: sourceExists, sources: paymentSources.map(s => s.id) });
       if (!sourceExists) {
         toast({
           title: "שגיאה",
@@ -189,19 +243,19 @@ export function useExpenseForm(editId?: string) {
     } catch (error) {
       console.error("Error saving expense:", error);
       
-      // Enhanced error handling
+      // Enhanced error handling with detailed logging
       let errorMessage = "אירעה שגיאה בעת שמירת ההוצאה";
       if (error instanceof Error) {
         console.error("Error details:", error.message);
+        console.error("Error stack:", error.stack);
         // Show more detailed error in development or for specific errors
-        if (process.env.NODE_ENV === 'development' || error.message.includes("נדרש") || error.message.includes("auth")) {
-          errorMessage = error.message;
-        }
+        errorMessage = error.message;
         
         // Handle Supabase-specific errors
         if (typeof error === 'object' && error !== null && 'code' in error) {
           const supabaseError = error as { code: string; message: string; details?: string };
           console.error("Supabase error code:", supabaseError.code);
+          console.error("Supabase error message:", supabaseError.message);
           console.error("Supabase error details:", supabaseError.details);
           
           if (supabaseError.code === '42501') {
@@ -210,8 +264,12 @@ export function useExpenseForm(editId?: string) {
             errorMessage = "רשומה עם מזהה זהה כבר קיימת במערכת";
           } else if (supabaseError.code === '23503') {
             errorMessage = "הפנייה לקטגוריה או לאמצעי תשלום שאינם קיימים במערכת";
+          } else if (supabaseError.message && supabaseError.message.includes('auth')) {
+            errorMessage = "בעיית אימות - נא להתחבר מחדש";
           }
         }
+      } else {
+        console.error("Unknown error type:", error);
       }
       
       toast({
