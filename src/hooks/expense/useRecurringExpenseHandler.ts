@@ -16,6 +16,14 @@ export function useRecurringExpenseHandler() {
     if (!formData.startDate) {
       throw new Error("יש להזין תאריך התחלה");
     }
+
+    if (!formData.categoryId) {
+      throw new Error("יש לבחור קטגוריה");
+    }
+
+    if (!formData.paymentSourceId) {
+      throw new Error("יש לבחור אמצעי תשלום");
+    }
     
     return generateRecurringExpenses(
       amount,

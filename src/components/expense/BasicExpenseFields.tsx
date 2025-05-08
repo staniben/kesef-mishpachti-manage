@@ -3,6 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ExpenseCategory, PaymentSource } from "@/types";
+import { useEffect } from "react";
 
 interface BasicExpenseFieldsProps {
   name: string;
@@ -27,7 +28,13 @@ export function BasicExpenseFields({
   onSelectChange,
   disableAmount = false
 }: BasicExpenseFieldsProps) {
-   console.log("Categories in UI:", categories);
+  useEffect(() => {
+    console.log("BasicExpenseFields rendered with categories:", categories);
+    console.log("BasicExpenseFields rendered with paymentSources:", paymentSources);
+    console.log("Current categoryId:", categoryId);
+    console.log("Current paymentSourceId:", paymentSourceId);
+  }, [categories, paymentSources, categoryId, paymentSourceId]);
+   
   return (
     <>
       <div className="space-y-2">
@@ -69,11 +76,17 @@ export function BasicExpenseFields({
             <SelectValue placeholder="בחר קטגוריה" />
           </SelectTrigger>
           <SelectContent>
-            {categories.map((category) => (
-              <SelectItem key={category.id} value={category.id}>
-                {category.name}
+            {categories && categories.length > 0 ? (
+              categories.map((category) => (
+                <SelectItem key={category.id} value={category.id}>
+                  {category.name}
+                </SelectItem>
+              ))
+            ) : (
+              <SelectItem disabled value="none">
+                אין קטגוריות זמינות
               </SelectItem>
-            ))}
+            )}
           </SelectContent>
         </Select>
       </div>
@@ -88,11 +101,17 @@ export function BasicExpenseFields({
             <SelectValue placeholder="בחר אמצעי תשלום" />
           </SelectTrigger>
           <SelectContent>
-            {paymentSources.map((source) => (
-              <SelectItem key={source.id} value={source.id}>
-                {source.name}
+            {paymentSources && paymentSources.length > 0 ? (
+              paymentSources.map((source) => (
+                <SelectItem key={source.id} value={source.id}>
+                  {source.name}
+                </SelectItem>
+              ))
+            ) : (
+              <SelectItem disabled value="none">
+                אין אמצעי תשלום זמינים
               </SelectItem>
-            ))}
+            )}
           </SelectContent>
         </Select>
       </div>
