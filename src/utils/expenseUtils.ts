@@ -1,4 +1,3 @@
-
 import { Expense } from '@/types/models';
 import { v4 as uuidv4 } from 'uuid';
 import { addMonths } from 'date-fns';
@@ -38,7 +37,7 @@ export const createSingleExpenseFromForm = (formData: ExpenseFormData, userId: s
     categoryId: formData.categoryId,
     paymentSourceId: formData.paymentSourceId,
     paymentType: 'one-time', // Fix: Use proper PaymentType value
-    user_id: userId,
+    user_id: userId, // Use the provided userId instead of hardcoded value
     createdAt: now,
     updatedAt: now,
   };
@@ -79,7 +78,7 @@ export const createInstallmentExpensesFromForm = (formData: ExpenseFormData, use
       installmentNumber: i + 1,
       totalInstallments: numberOfInstallments,
       isInstallment: true,
-      user_id: userId,
+      user_id: userId, // Use the provided userId instead of hardcoded value
       createdAt: now,
       updatedAt: now,
     });
@@ -109,7 +108,7 @@ export const createRecurringExpenseFromForm = (formData: ExpenseFormData, userId
     recurrenceType: 'monthly', // Currently only supporting monthly
     totalInstallments: 0, // Infinite
     installmentNumber: 1,
-    user_id: userId,
+    user_id: userId, // Use the provided userId instead of hardcoded value
     createdAt: now,
     updatedAt: now,
   };
@@ -190,7 +189,8 @@ export const createBaseExpense = (
   name: string, 
   categoryId: string, 
   paymentSourceId: string, 
-  paymentType: string
+  paymentType: string,
+  userId: string // Add userId parameter
 ): Expense => {
   const now = new Date().toISOString();
   
@@ -203,7 +203,7 @@ export const createBaseExpense = (
     categoryId: categoryId,
     paymentSourceId: paymentSourceId,
     paymentType: paymentType as 'one-time' | 'installment' | 'recurring',
-    user_id: 'mock-user-id', // This should be replaced with the actual user ID in production
+    user_id: userId, // Use the provided userId instead of hardcoded value
     createdAt: now,
     updatedAt: now,
   };
@@ -218,7 +218,8 @@ export const generateRecurringExpenses = (
   name: string,
   categoryId: string,
   paymentSourceId: string,
-  time?: string
+  time?: string,
+  userId: string = '' // Add userId parameter with default empty string
 ): Expense[] => {
   const now = new Date().toISOString();
   const recurrenceId = generateId();
@@ -237,7 +238,7 @@ export const generateRecurringExpenses = (
     isRecurring: true,
     recurrenceId: recurrenceId,
     recurrenceType: 'monthly',
-    user_id: 'mock-user-id', // This should be replaced with the actual user ID in production
+    user_id: userId, // Use the provided userId parameter
     createdAt: now,
     updatedAt: now,
   }];
@@ -253,7 +254,8 @@ export const generateInstallmentExpenses = (
   name: string,
   categoryId: string,
   paymentSourceId: string,
-  time?: string
+  time?: string,
+  userId: string = '' // Add userId parameter with default empty string
 ): Expense[] => {
   const now = new Date().toISOString();
   const installmentAmount = totalAmount / numberOfInstallments;
@@ -274,7 +276,7 @@ export const generateInstallmentExpenses = (
       isInstallment: true,
       installmentNumber: i + 1,
       totalInstallments: numberOfInstallments,
-      user_id: 'mock-user-id', // This should be replaced with the actual user ID in production
+      user_id: userId, // Use the provided userId parameter
       createdAt: now,
       updatedAt: now,
     });

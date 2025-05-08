@@ -3,9 +3,11 @@ import { Expense } from "@/types/models";
 import { ExpenseFormData } from "./expenseFormTypes";
 import { generateInstallmentExpenses } from "@/utils/expenseUtils";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext"; // Import useAuth
 
 export function useInstallmentExpenseHandler() {
   const { toast } = useToast();
+  const { user } = useAuth(); // Get the current user from auth context
 
   const handleInstallmentExpense = (formData: ExpenseFormData) => {
     const totalAmount = parseFloat(formData.totalAmount);
@@ -22,6 +24,10 @@ export function useInstallmentExpenseHandler() {
       throw new Error("יש להזין תאריך התחלה");
     }
     
+    if (!user) {
+      throw new Error("יש להתחבר למערכת כדי להוסיף הוצאה");
+    }
+    
     return generateInstallmentExpenses(
       totalAmount,
       installments,
@@ -29,7 +35,8 @@ export function useInstallmentExpenseHandler() {
       formData.name,
       formData.categoryId,
       formData.paymentSourceId,
-      formData.time
+      formData.time,
+      user.id // Pass the user ID from auth
     );
   };
 
