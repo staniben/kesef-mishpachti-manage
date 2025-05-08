@@ -1,7 +1,7 @@
 
-import { Expense } from "@/types/models";
+import { Expense, RecurrenceType } from "@/types/models";
 import { ExpenseFormData } from "./expenseFormTypes";
-import { generateRecurringExpenses } from "@/utils/expense";
+import { generateRecurringExpenses } from "@/utils/expenseUtils";
 import { useToast } from "@/hooks/use-toast";
 
 export function useRecurringExpenseHandler() {

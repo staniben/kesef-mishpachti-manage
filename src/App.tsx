@@ -8,7 +8,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute, AuthRoute } from "./components/ProtectedRoute";
 import { Layout } from "./components/layout/Layout";
-import { StoreInitializer } from "./components/store/StoreInitializer";
 import Dashboard from "./pages/Dashboard";
 import AddExpense from "./pages/AddExpense";
 import EditExpense from "./pages/EditExpense";
@@ -27,7 +26,6 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <StoreInitializer />
           <Routes>
             {/* Auth routes (redirect to home if logged in) */}
             <Route element={<AuthRoute />}>

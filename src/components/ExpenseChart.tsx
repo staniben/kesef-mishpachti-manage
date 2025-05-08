@@ -1,57 +1,131 @@
 
-import React, { useMemo } from "react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Expense, ExpenseCategory } from "@/types/models";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { useAppStore } from "@/store";
-import { Card, CardContent } from "./ui/card";
-import { filterExpensesByMonth, groupExpensesByCategory } from "@/utils/expense";
+import { filterExpensesByMonth, groupExpensesByCategory, groupExpensesByPaymentSource } from "@/utils/expenseUtils";
 
-interface ExpenseChartProps {
-  year?: number;
-  month?: number;
-}
-
-const ExpenseChart: React.FC<ExpenseChartProps> = ({ year, month }) => {
-  const expenses = useAppStore((state) => state.expenses);
-  const categories = useAppStore((state) => state.categories);
-
-  const filteredExpenses = useMemo(() => {
-    let currentExpenses = expenses;
-    if (year && month !== undefined) {
-      currentExpenses = filterExpensesByMonth(expenses, year, month);
-    }
-    return currentExpenses;
-  }, [expenses, year, month]);
-
-  const groupedExpenses = useMemo(() => {
-    return groupExpensesByCategory(filteredExpenses);
-  }, [filteredExpenses]);
-
-  const chartData = useMemo(() => {
-    return Object.entries(groupedExpenses).map(([categoryId, amount]) => {
-      const category = categories.find((cat) => cat.id === categoryId);
-      return {
-        name: category?.name || "Unknown",
-        total: amount,
-      };
-    });
-  }, [groupedExpenses, categories]);
-
-  return (
-    <Card>
-      <CardContent className="pl-2 pb-4">
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip />
-            <Bar dataKey="total" fill="#8884d8" />
-          </BarChart>
-        </ResponsiveContainer>
-      </CardContent>
-    </Card>
-  );
+type ChartDataItem = {
+  name: string;
+  value: number;
+  color: string;
+  id: string;
 };
 
-export default ExpenseChart;
+type ViewMode = "category" | "source";
+
+export function ExpenseChart({ onSliceClick }: { onSliceClick?: (id: string, type: ViewMode) => void }) {
+  const { expenses, categories, paymentSources, currentMonth, currentYear } = useAppStore();
+  const [viewMode, setViewMode] = useState<ViewMode>("category");
+
+  // Filter expenses for current month
+  const filteredExpenses = filterExpensesByMonth(expenses, currentMonth, currentYear);
+
+  // Calculate data for the chart based on view mode
+  const calculateChartData = (): ChartDataItem[] => {
+    if (viewMode === "category") {
+      // Group by category
+      const categoryTotals = groupExpensesByCategory(filteredExpenses);
+      
+      // Map to chart data
+      return Object.entries(categoryTotals).map(([categoryId, total]) => {
+        const category = categories.find(cat => cat.id === categoryId);
+        return {
+          name: category?.name || "לא מוגדר",
+          value: Number(total), // Ensure this is a number
+          color: category?.color || "#999",
+          id: categoryId
+        };
+      });
+    } else {
+      // Group by payment source
+      const sourceTotals = groupExpensesByPaymentSource(filteredExpenses);
+      
+      // Map to chart data
+      return Object.entries(sourceTotals).map(([sourceId, total]) => {
+        const source = paymentSources.find(src => src.id === sourceId);
+        return {
+          name: source?.name || "לא מוגדר",
+          value: Number(total), // Ensure this is a number
+          color: source?.color || "#999",
+          id: sourceId
+        };
+      });
+    }
+  };
+
+  const data = calculateChartData();
+  
+  // Handle empty data
+  if (data.length === 0) {
+    return (
+      <div className="text-center p-8 bg-card rounded-lg shadow-sm">
+        <h3 className="text-xl font-medium mb-4">אין נתונים להצגה</h3>
+        <p className="text-muted-foreground">לא נמצאו הוצאות בחודש הנוכחי</p>
+      </div>
+    );
+  }
+
+  const totalAmount = data.reduce((sum, item) => sum + item.value, 0);
+  
+  // Handle chart click
+  const handleChartClick = (data: any, index: number) => {
+    if (onSliceClick && data[index]) {
+      onSliceClick(data[index].id, viewMode);
+    }
+  };
+
+  return (
+    <div className="bg-card rounded-lg shadow-sm p-4">
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-xl font-medium">סיכום הוצאות</h3>
+        <div className="flex gap-2">
+          <Button 
+            variant={viewMode === "category" ? "default" : "outline"} 
+            size="sm"
+            onClick={() => setViewMode("category")}
+          >
+            לפי קטגוריה
+          </Button>
+          <Button 
+            variant={viewMode === "source" ? "default" : "outline"} 
+            size="sm"
+            onClick={() => setViewMode("source")}
+          >
+            לפי אמצעי תשלום
+          </Button>
+        </div>
+      </div>
+
+      <div className="text-center mb-4">
+        <h4 className="text-lg font-medium">סה"כ: {totalAmount.toLocaleString()} ₪</h4>
+      </div>
+
+      <ResponsiveContainer width="100%" height={300}>
+        <PieChart>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="50%"
+            labelLine={false}
+            outerRadius={100}
+            fill="#8884d8"
+            dataKey="value"
+            nameKey="name"
+            onClick={(_, index) => handleChartClick(data, index)}
+            cursor="pointer"
+          >
+            {data.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.color} />
+            ))}
+          </Pie>
+          <Tooltip 
+            formatter={(value: number) => `${value.toLocaleString()} ₪`} 
+            contentStyle={{ direction: 'rtl', textAlign: 'right' }}
+          />
+          <Legend layout="vertical" align="right" verticalAlign="middle" />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}

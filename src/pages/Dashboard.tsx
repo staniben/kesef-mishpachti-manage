@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { MonthSelector } from "@/components/MonthSelector";
-import ExpenseChart from "@/components/ExpenseChart";
+import { ExpenseChart } from "@/components/ExpenseChart";
 import { ExpensesList } from "@/components/ExpensesList";
 import { Button } from "@/components/ui/button";
 import { Plus, FileDown } from "lucide-react";
@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAppStore } from "@/store";
 import { exportToExcel } from "@/utils/exportUtils";
-import { filterExpensesByMonth } from "@/utils/expense";
+import { filterExpensesByMonth } from "@/utils/expenseUtils";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -37,7 +37,7 @@ export default function Dashboard() {
   };
   
   const handleExportToExcel = () => {
-    const monthlyExpenses = filterExpensesByMonth(expenses, currentYear, currentMonth);
+    const monthlyExpenses = filterExpensesByMonth(expenses, currentMonth, currentYear);
     
     if (monthlyExpenses.length === 0) {
       toast({
@@ -102,7 +102,7 @@ export default function Dashboard() {
       
       <div className="grid grid-cols-1 gap-6">
         {!filterId && (
-          <ExpenseChart />
+          <ExpenseChart onSliceClick={handleChartSliceClick} />
         )}
         
         <ExpensesList

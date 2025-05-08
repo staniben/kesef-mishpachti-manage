@@ -1,93 +1,130 @@
 
-import React, { useMemo } from "react";
-import { formatDate } from "@/lib/utils";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Edit, Trash } from "lucide-react";
 import { useAppStore } from "@/store";
-import { Card, CardHeader, CardTitle, CardContent } from "./ui/card";
-import { Separator } from "./ui/separator";
-import { Badge } from "./ui/badge";
-import { filterExpensesByMonth, sortExpensesByDate } from "@/utils/expense";
+import { filterExpensesByMonth, sortExpensesByDate } from "@/utils/expenseUtils";
 
-interface ExpensesListProps {
-  categoryId?: string;
+type ExpensesListProps = {
   filterId?: string;
   filterType?: "category" | "source";
   onEditExpense?: (id: string) => void;
-}
+};
 
-export function ExpensesList({ categoryId, filterId, filterType, onEditExpense }: ExpensesListProps) {
-  const currentMonth = useAppStore((state) => state.currentMonth);
-  const currentYear = useAppStore((state) => state.currentYear);
-  const expenses = useAppStore((state) => state.expenses);
-  const categories = useAppStore((state) => state.categories);
-  const paymentSources = useAppStore((state) => state.paymentSources);
-
-  const filteredExpenses = useMemo(() => {
-    let monthlyExpenses = filterExpensesByMonth(expenses, currentYear, currentMonth);
-
-    if (categoryId) {
-      monthlyExpenses = monthlyExpenses.filter((expense) => expense.categoryId === categoryId);
+export function ExpensesList({ filterId, filterType, onEditExpense }: ExpensesListProps) {
+  const { expenses, categories, paymentSources, currentMonth, currentYear, deleteExpense } = useAppStore();
+  
+  // Filter expenses for current month and optional filter by category or source
+  const filteredExpenses = expenses.filter(expense => {
+    const date = new Date(expense.date);
+    const monthMatches = date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+    
+    if (!filterId) return monthMatches;
+    
+    if (filterType === "category") {
+      return monthMatches && expense.categoryId === filterId;
+    } else if (filterType === "source") {
+      return monthMatches && expense.paymentSourceId === filterId;
     }
     
-    if (filterId && filterType) {
-      if (filterType === "category") {
-        monthlyExpenses = monthlyExpenses.filter((expense) => expense.categoryId === filterId);
-      } else if (filterType === "source") {
-        monthlyExpenses = monthlyExpenses.filter((expense) => expense.paymentSourceId === filterId);
-      }
+    return monthMatches;
+  });
+  
+  // Sort expenses by date (newest first)
+  const sortedExpenses = sortExpensesByDate(filteredExpenses);
+  
+  // Helper function to get category name
+  const getCategoryName = (categoryId: string): string => {
+    const category = categories.find(cat => cat.id === categoryId);
+    return category?.name || "לא מוגדר";
+  };
+  
+  // Helper function to get payment source name
+  const getPaymentSourceName = (sourceId: string): string => {
+    const source = paymentSources.find(src => src.id === sourceId);
+    return source?.name || "לא מוגדר";
+  };
+  
+  // Handle delete expense
+  const handleDelete = async (id: string) => {
+    if (window.confirm("האם אתה בטוח שברצונך למחוק הוצאה זו?")) {
+      await deleteExpense(id);
     }
+  };
 
-    return sortExpensesByDate(monthlyExpenses);
-  }, [expenses, currentMonth, currentYear, categoryId, filterId, filterType]);
-
-  if (!filteredExpenses || filteredExpenses.length === 0) {
+  if (filteredExpenses.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>No Expenses</CardTitle>
-        </CardHeader>
-        <CardContent>No expenses found for this month.</CardContent>
-      </Card>
+      <div className="text-center p-8 bg-card rounded-lg shadow-sm">
+        <h3 className="text-xl font-medium mb-4">אין הוצאות להצגה</h3>
+        <p className="text-muted-foreground">לא נמצאו הוצאות בחודש הנוכחי</p>
+      </div>
     );
   }
-
+  
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Expenses</CardTitle>
-      </CardHeader>
-      <CardContent className="p-4">
-        <ul className="list-none p-0">
-          {filteredExpenses.map((expense) => {
-            const category = categories.find((cat) => cat.id === expense.categoryId);
-            const paymentSource = paymentSources.find((source) => source.id === expense.paymentSourceId);
-
-            return (
-              <li key={expense.id} className="mb-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-semibold">{expense.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {formatDate(new Date(expense.date))}
-                    </div>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="mr-4 font-bold">₪{expense.amount}</div>
-                    {category && (
-                      <Badge className="mr-2" style={{ backgroundColor: category.color, color: 'white' }}>
-                        {category.name}
-                      </Badge>
+    <div className="bg-card rounded-lg shadow-sm p-4 overflow-hidden">
+      <h3 className="text-xl font-medium mb-6">
+        {filterId && filterType === "category" 
+          ? `הוצאות בקטגוריה: ${getCategoryName(filterId)}`
+          : filterId && filterType === "source"
+          ? `הוצאות באמצעי תשלום: ${getPaymentSourceName(filterId)}`
+          : "כל ההוצאות"}
+      </h3>
+      
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>תאריך</TableHead>
+              <TableHead>שם</TableHead>
+              <TableHead>קטגוריה</TableHead>
+              <TableHead>אמצעי תשלום</TableHead>
+              <TableHead>סכום</TableHead>
+              <TableHead>סוג</TableHead>
+              <TableHead>פעולות</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sortedExpenses.map((expense) => (
+              <TableRow key={expense.id}>
+                <TableCell>{new Date(expense.date).toLocaleDateString('he-IL')}</TableCell>
+                <TableCell>{expense.name}</TableCell>
+                <TableCell>{getCategoryName(expense.categoryId)}</TableCell>
+                <TableCell>{getPaymentSourceName(expense.paymentSourceId)}</TableCell>
+                <TableCell className="font-medium">₪ {expense.amount.toLocaleString()}</TableCell>
+                <TableCell>
+                  {expense.isInstallment && expense.installmentNumber && expense.totalInstallments ? (
+                    <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-300">
+                      תשלום {expense.installmentNumber} מתוך {expense.totalInstallments}
+                    </Badge>
+                  ) : expense.isRecurring ? (
+                    <Badge variant="outline" className="bg-purple-50 text-purple-600 border-purple-300">
+                      תשלום קבוע
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-green-50 text-green-600 border-green-300">
+                      חד פעמי
+                    </Badge>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-2">
+                    {onEditExpense && (
+                      <Button variant="ghost" size="sm" onClick={() => onEditExpense(expense.id)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
                     )}
-                    {paymentSource && (
-                      <Badge variant="secondary">{paymentSource.name}</Badge>
-                    )}
+                    <Button variant="ghost" size="sm" onClick={() => handleDelete(expense.id)}>
+                      <Trash className="h-4 w-4" />
+                    </Button>
                   </div>
-                </div>
-                <Separator className="my-2" />
-              </li>
-            );
-          })}
-        </ul>
-      </CardContent>
-    </Card>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
   );
 }

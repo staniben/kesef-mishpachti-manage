@@ -1,7 +1,7 @@
 
 import { Expense } from "@/types/models";
 import { ExpenseFormData } from "./expenseFormTypes";
-import { generateInstallmentExpenses } from "@/utils/expense";
+import { generateInstallmentExpenses } from "@/utils/expenseUtils";
 import { useToast } from "@/hooks/use-toast";
 
 export function useInstallmentExpenseHandler() {
