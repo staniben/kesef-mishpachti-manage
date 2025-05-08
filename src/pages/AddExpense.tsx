@@ -2,10 +2,11 @@
 import { useEffect, useState } from "react";
 import { ExpenseForm } from "@/components/ExpenseForm";
 import { useAppStore } from "@/store";
-import { Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Loader2, AlertTriangle, CheckCircle2, Info } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { checkRlsAccess } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AddExpense() {
   const { categories, paymentSources, fetchCategories, fetchPaymentSources } = useAppStore();
@@ -13,6 +14,8 @@ export default function AddExpense() {
   const [error, setError] = useState<string | null>(null);
   const { user, isAuthenticated } = useAuth();
   const [rlsStatus, setRlsStatus] = useState<string>('checking');
+  const [rlsDetails, setRlsDetails] = useState<any>(null);
+  const { toast } = useToast();
 
   // Check RLS policies on component mount
   useEffect(() => {
@@ -23,21 +26,40 @@ export default function AddExpense() {
       }
       
       try {
+        console.log("AddExpense: Starting detailed RLS access check...");
         const result = await checkRlsAccess();
+        setRlsDetails(result);
+        
+        console.log("AddExpense: RLS check complete with result:", result);
+        
         if (result.success) {
           if (result.match) {
             setRlsStatus('ok');
+            console.log("AddExpense: RLS check passed with matching IDs");
           } else {
             setRlsStatus('mismatch');
+            console.warn("AddExpense: RLS check found ID mismatch:", result.auth_uid, "vs", result.user_id);
           }
-          console.log("RLS access check result:", result);
         } else {
-          setRlsStatus('failed');
-          console.error("RLS access check failed:", result.error);
+          // Detect which specific issue occurred
+          if (!result.all_tables_accessible) {
+            setRlsStatus('tables-inaccessible');
+            console.error("AddExpense: One or more tables are inaccessible");
+          } else if (!result.auth_uid_working) {
+            setRlsStatus('auth-uid-failed');
+            console.error("AddExpense: auth.uid() function not working");
+          } else if (!result.insert_working) {
+            setRlsStatus('insert-failed');
+            console.error("AddExpense: Insert test failed");
+          } else {
+            setRlsStatus('failed');
+            console.error("AddExpense: General RLS check failure");
+          }
         }
       } catch (error) {
+        console.error("AddExpense: Error checking RLS access:", error);
         setRlsStatus('error');
-        console.error("Error checking RLS access:", error);
+        setRlsDetails({ error });
       }
     };
     
@@ -91,6 +113,54 @@ export default function AddExpense() {
     loadData();
   }, [categories.length, paymentSources.length, fetchCategories, fetchPaymentSources, user, isAuthenticated]);
 
+  // Add handler to retry RLS check
+  const handleRetryRlsCheck = async () => {
+    setRlsStatus('checking');
+    
+    try {
+      toast({
+        title: "בדיקה מחדש",
+        description: "מבצע בדיקת הרשאות מחדש...",
+      });
+      
+      const result = await checkRlsAccess();
+      setRlsDetails(result);
+      
+      if (result.success) {
+        if (result.match) {
+          setRlsStatus('ok');
+          toast({
+            title: "בדיקה הסתיימה בהצלחה",
+            description: "הרשאות הגישה תקינות",
+            variant: "default",
+          });
+        } else {
+          setRlsStatus('mismatch');
+          toast({
+            title: "אי התאמה",
+            description: "זוהה חוסר התאמה בין זיהוי המשתמש למערכת ההרשאות",
+            variant: "destructive",
+          });
+        }
+      } else {
+        setRlsStatus('failed');
+        toast({
+          title: "בדיקה נכשלה",
+          description: "הרשאות הגישה אינן תקינות",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error retrying RLS check:", error);
+      setRlsStatus('error');
+      toast({
+        title: "שגיאה",
+        description: "אירעה שגיאה בבדיקת הרשאות הגישה",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -109,16 +179,106 @@ export default function AddExpense() {
         </Alert>
       )}
       
-      {rlsStatus !== 'ok' && (
-        <Alert variant="warning" className="bg-amber-50 border-amber-400">
-          <AlertTriangle className="h-4 w-4 text-amber-600" />
+      {rlsStatus === 'checking' && (
+        <Alert>
+          <Loader2 className="h-4 w-4 animate-spin" />
           <AlertTitle>בדיקת מדיניות אבטחה (RLS)</AlertTitle>
           <AlertDescription>
-            {rlsStatus === 'checking' && 'בודק הרשאות גישה...'}
-            {rlsStatus === 'no-user' && 'יש להתחבר למערכת כדי לבדוק הרשאות'}
-            {rlsStatus === 'mismatch' && 'זוהה חוסר התאמה בין זיהוי המשתמש למערכת ההרשאות'}
-            {rlsStatus === 'failed' && 'בדיקת הרשאות נכשלה - ייתכן שלא היו הרשאות RLS'}
-            {rlsStatus === 'error' && 'אירעה שגיאה בבדיקת הרשאות'}
+            בודק הרשאות גישה...
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {rlsStatus === 'no-user' && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>בדיקת מדיניות אבטחה (RLS)</AlertTitle>
+          <AlertDescription>
+            יש להתחבר למערכת כדי לבדוק הרשאות
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {(rlsStatus === 'mismatch' || rlsStatus === 'auth-uid-failed') && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>בדיקת מדיניות אבטחה (RLS)</AlertTitle>
+          <AlertDescription className="space-y-2">
+            <p>זוהה חוסר התאמה בין זיהוי המשתמש למערכת ההרשאות</p>
+            {rlsDetails && (
+              <div className="text-xs bg-muted/50 p-2 rounded">
+                <div>Auth UID: {rlsDetails.auth_uid || 'לא זמין'}</div>
+                <div>User ID: {rlsDetails.user_id || 'לא זמין'}</div>
+              </div>
+            )}
+            <button 
+              onClick={handleRetryRlsCheck} 
+              className="text-xs bg-muted hover:bg-muted/80 px-2 py-1 rounded mt-2"
+            >
+              בדוק שוב
+            </button>
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {(rlsStatus === 'tables-inaccessible' || rlsStatus === 'insert-failed') && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>בדיקת מדיניות אבטחה (RLS)</AlertTitle>
+          <AlertDescription className="space-y-2">
+            <p>נמצאו בעיות בהרשאות גישה לטבלאות הנתונים</p>
+            {rlsStatus === 'tables-inaccessible' && (
+              <p className="text-xs">לא ניתן לגשת לחלק מהטבלאות במסד הנתונים</p>
+            )}
+            {rlsStatus === 'insert-failed' && (
+              <p className="text-xs">לא ניתן להוסיף נתונים לטבלאות</p>
+            )}
+            <button 
+              onClick={handleRetryRlsCheck} 
+              className="text-xs bg-muted hover:bg-muted/80 px-2 py-1 rounded mt-2"
+            >
+              בדוק שוב
+            </button>
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {rlsStatus === 'failed' && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>בדיקת מדיניות אבטחה (RLS)</AlertTitle>
+          <AlertDescription className="space-y-2">
+            <p>בדיקת הרשאות נכשלה - ייתכן שלא הוגדרו מדיניות RLS</p>
+            {rlsDetails?.message && (
+              <p className="text-xs">{rlsDetails.message}</p>
+            )}
+            <button 
+              onClick={handleRetryRlsCheck} 
+              className="text-xs bg-muted hover:bg-muted/80 px-2 py-1 rounded mt-2"
+            >
+              בדוק שוב
+            </button>
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {rlsStatus === 'error' && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>בדיקת מדיניות אבטחה (RLS)</AlertTitle>
+          <AlertDescription className="space-y-2">
+            <p>אירעה שגיאה בבדיקת הרשאות</p>
+            {rlsDetails?.error && (
+              <div className="text-xs bg-muted/50 p-2 rounded overflow-auto max-h-20">
+                {String(rlsDetails.error)}
+              </div>
+            )}
+            <button 
+              onClick={handleRetryRlsCheck} 
+              className="text-xs bg-muted hover:bg-muted/80 px-2 py-1 rounded mt-2"
+            >
+              בדוק שוב
+            </button>
           </AlertDescription>
         </Alert>
       )}
@@ -146,6 +306,17 @@ export default function AddExpense() {
             <div className="text-sm text-muted-foreground mb-1">קטגוריות זמינות: {categories.length}</div>
             <div className="text-sm text-muted-foreground mb-1">אמצעי תשלום זמינים: {paymentSources.length}</div>
           </div>
+          
+          {/* Show diagnostic info but don't prevent form usage */}
+          {(rlsStatus !== 'ok' && rlsStatus !== 'checking' && rlsStatus !== 'no-user') && (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertTitle>מידע אבחון</AlertTitle>
+              <AlertDescription>
+                למרות חוסר ההתאמה בהרשאות, ניתן להמשיך ולצפות בטופס. ייתכן שפעולת השמירה לא תעבוד.
+              </AlertDescription>
+            </Alert>
+          )}
           
           <ExpenseForm />
         </>

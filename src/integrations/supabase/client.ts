@@ -32,7 +32,7 @@ export const supabase = createClient<Database>(
 ) as unknown as SupabaseClientWithRpc;
 
 /**
- * Utility to check RLS access for debugging
+ * Enhanced utility to check RLS access for debugging
  */
 export const checkRlsAccess = async () => {
   try {
@@ -44,44 +44,121 @@ export const checkRlsAccess = async () => {
       console.error("User not authenticated:", userError);
       return { 
         success: false, 
-        error: userError || "No authenticated user found" 
+        error: userError || "No authenticated user found",
+        message: "User not authenticated" 
       };
     }
     
-    // Check if we can access the categories table (testing RLS)
-    const { data: catData, error: catError } = await supabase
-      .from('categories')
-      .select('count(*)', { count: 'exact', head: true });
+    console.log("Authenticated user:", userData.user.id);
+    
+    // Test multiple tables to find which one might be causing issues
+    const tables = ['categories', 'expenses', 'payment_sources'];
+    const results: Record<string, any> = {};
+    
+    for (const table of tables) {
+      console.log(`Testing RLS access for ${table}...`);
       
-    if (catError) {
-      console.error("RLS check for categories failed:", catError);
-      return { success: false, error: catError };
+      try {
+        const { data, error } = await supabase
+          .from(table)
+          .select('count(*)', { count: 'exact', head: true });
+          
+        if (error) {
+          console.error(`RLS check for ${table} failed:`, error);
+          results[table] = { success: false, error };
+        } else {
+          console.log(`RLS check for ${table} passed! Count:`, data?.count);
+          results[table] = { success: true, count: data?.count };
+        }
+      } catch (e) {
+        console.error(`Error checking RLS for ${table}:`, e);
+        results[table] = { success: false, error: e };
+      }
     }
     
-    console.log("RLS check for categories passed!");
+    // Test INSERT capability on expenses to verify write access
+    try {
+      console.log("Testing INSERT capability for expenses...");
+      const testId = `test-${Date.now()}`;
+      const { error: insertError } = await supabase
+        .from('expenses')
+        .insert({
+          id: testId,
+          title: 'Test Expense',
+          amount: 100,
+          date: new Date().toISOString(),
+          payment_type: 'one-time',
+          user_id: userData.user.id
+        })
+        .select();
+      
+      if (insertError) {
+        console.error("INSERT test failed:", insertError);
+        results['insert_test'] = { success: false, error: insertError };
+      } else {
+        console.log("INSERT test successful!");
+        results['insert_test'] = { success: true };
+        
+        // Clean up test data
+        const { error: deleteError } = await supabase
+          .from('expenses')
+          .delete()
+          .eq('id', testId);
+          
+        if (deleteError) {
+          console.error("Failed to clean up test data:", deleteError);
+        }
+      }
+    } catch (e) {
+      console.error("Error testing INSERT capability:", e);
+      results['insert_test'] = { success: false, error: e };
+    }
     
     // Check auth.uid() using our helper function
-    const { data: authData, error: authError } = await supabase
-      .rpc('get_auth_uid');
-      
-    if (authError) {
-      console.error("Failed to get auth.uid():", authError);
-      return { success: false, error: authError };
+    try {
+      const { data: authData, error: authError } = await supabase
+        .rpc('get_auth_uid');
+        
+      if (authError) {
+        console.error("Failed to get auth.uid():", authError);
+        results['auth_uid'] = { success: false, error: authError };
+      } else {
+        console.log("Current auth.uid():", authData);
+        console.log("Current user.id:", userData.user.id);
+        results['auth_uid'] = { success: true, auth_uid: authData, user_id: userData.user.id };
+      }
+    } catch (e) {
+      console.error("Error checking auth.uid():", e);
+      results['auth_uid'] = { success: false, error: e };
     }
     
-    // Log details for debugging
-    console.log("Current auth.uid():", authData);
-    console.log("Current user.id:", userData.user.id);
+    // Determine overall success status
+    const allTablesSuccess = tables.every(table => results[table]?.success);
+    const authUidSuccess = results['auth_uid']?.success;
+    const insertSuccess = results['insert_test']?.success;
     
+    // Return comprehensive result
+    const authUidMatch = results['auth_uid']?.success ? 
+      results['auth_uid']?.auth_uid === userData.user.id : false;
+      
     return {
-      success: true, 
-      auth_uid: authData,
+      success: allTablesSuccess && authUidSuccess, 
+      all_tables_accessible: allTablesSuccess,
+      auth_uid_working: authUidSuccess,
+      insert_working: insertSuccess,
+      tables: results,
+      auth_uid: results['auth_uid']?.auth_uid,
       user_id: userData.user.id,
-      match: authData === userData.user.id
+      match: authUidMatch,
+      message: !allTablesSuccess ? "One or more tables inaccessible" : 
+               !authUidSuccess ? "Failed to verify auth.uid()" :
+               !insertSuccess ? "Failed to insert test data" :
+               !authUidMatch ? "auth.uid() doesn't match user ID" : 
+               "All checks passed"
     };
     
   } catch (e) {
-    console.error("Error checking RLS access:", e);
-    return { success: false, error: e };
+    console.error("Error in checkRlsAccess:", e);
+    return { success: false, error: e, message: "Error in RLS check function" };
   }
 };

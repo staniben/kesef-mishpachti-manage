@@ -24,7 +24,7 @@ export function useSingleExpenseHandler() {
         toast({
           title: "בדיקת הרשאות נכשלה",
           description: "ייתכן שיש בעיה בהרשאות הגישה לנתונים. נא לרענן את הדף ולנסות שוב.",
-          variant: "destructive",
+          variant: "destructive", // Changed from "warning" to "destructive" to match available variants
         });
       }
     } catch (err) {
