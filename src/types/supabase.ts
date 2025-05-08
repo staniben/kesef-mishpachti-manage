@@ -17,14 +17,18 @@ export interface DbExpense {
   title: string;
   amount: number;
   date: string;
+  time: string | null;
   category_id: string | null;
   payment_source_id: string | null;
   payment_type: string;
   recurring: boolean | null;
   recurring_interval: string | null;
   recurring_end_date: string | null;
+  recurrence_id: string | null;
   installment: boolean | null;
   installment_count: number | null;
+  total_installments: number | null;
+  related_expense_id: string | null;
   user_id: string;
   created_at: string;
   updated_at: string;

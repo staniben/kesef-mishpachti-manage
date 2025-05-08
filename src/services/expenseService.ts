@@ -1,6 +1,7 @@
 import { Expense } from '@/types/models';
 import { supabase } from '@/integrations/supabase/client';
 import { generateId } from './mockData';
+import { mapDbExpenseToModel, mapModelToDbExpense } from '@/utils/dataMappers';
 
 // Helper function to map Supabase DB schema to our frontend model
 const mapDbExpenseToModel = (dbExpense: any): Expense => ({
@@ -36,7 +37,7 @@ const validateExpenseForDB = (expense: Expense): string | null => {
 };
 
 // Helper function to map frontend model to Supabase DB schema
-const mapModelToDbExpense = (expense: Expense) => {
+const mapModelToDbExpense = (expense: Expense, userId: string) => {
   // Create a database-compatible object
   const dbExpense = {
     id: expense.id,
@@ -56,7 +57,7 @@ const mapModelToDbExpense = (expense: Expense) => {
     recurrence_id: expense.recurrenceId,
     created_at: expense.createdAt || new Date().toISOString(),
     updated_at: expense.updatedAt || new Date().toISOString(),
-    user_id: null // Will be set in each method with the authenticated user's ID
+    user_id: userId // Will be set in each method with the authenticated user's ID
   };
   
   return dbExpense;
@@ -64,8 +65,26 @@ const mapModelToDbExpense = (expense: Expense) => {
 
 // Helper function to check RLS access
 const checkRlsAccess = async () => {
-  // Implement your RLS access check logic here
-  return true; // Placeholder for RLS access check
+  try {
+    console.log("Testing RLS access in expenseService...");
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData?.user) return false;
+    
+    // Quick check to see if we can access expenses
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('count(*)', { count: 'exact', head: true });
+    
+    if (error) {
+      console.error('RLS check failed:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('RLS check error:', error);
+    return false;
+  }
 };
 
 export const expenseService = {
@@ -209,6 +228,7 @@ export const expenseService = {
       }
       
       console.log('Creating expense with authenticated user:', userData.user.id);
+      console.log('Expense data:', expense);
       
       // Check RLS access before creating expense
       try {
@@ -226,13 +246,14 @@ export const expenseService = {
         throw error;
       }
       
-      const dbExpense = mapModelToDbExpense({
-        ...expense,
-        id: expense.id || generateId(),
-      });
-      
-      // Set the user_id from authenticated session
-      dbExpense.user_id = userData.user.id;
+      // Use the mapper function to convert our model to DB schema
+      const dbExpense = mapModelToDbExpense(
+        {
+          ...expense,
+          id: expense.id || generateId(),
+        }, 
+        userData.user.id
+      );
       
       // Log what we're sending to Supabase for debugging
       console.log('Creating expense with data:', dbExpense);
@@ -300,15 +321,12 @@ export const expenseService = {
         throw error;
       }
       
+      // Use the mapper function to convert our models to DB schema
       const dbExpenses = newExpenses.map(expense => {
-        const dbExpense = mapModelToDbExpense({
+        return mapModelToDbExpense({
           ...expense,
           id: expense.id || generateId(),
-        });
-        
-        // Set the user_id from authenticated session
-        dbExpense.user_id = userData.user.id;
-        return dbExpense;
+        }, userData.user.id);
       });
       
       console.log('Creating batch expenses:', dbExpenses);

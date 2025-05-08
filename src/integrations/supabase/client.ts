@@ -142,7 +142,7 @@ export const checkRlsAccess = async () => {
       results['auth_uid']?.auth_uid === userData.user.id : false;
       
     return {
-      success: allTablesSuccess && authUidSuccess, 
+      success: allTablesSuccess && authUidSuccess && insertSuccess, 
       all_tables_accessible: allTablesSuccess,
       auth_uid_working: authUidSuccess,
       insert_working: insertSuccess,

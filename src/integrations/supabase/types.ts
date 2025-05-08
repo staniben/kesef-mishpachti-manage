@@ -47,10 +47,14 @@ export type Database = {
           installment_count: number | null
           payment_source_id: string | null
           payment_type: string
+          recurrence_id: string | null
           recurring: boolean | null
           recurring_end_date: string | null
           recurring_interval: string | null
+          related_expense_id: string | null
+          time: string | null
           title: string
+          total_installments: number | null
           updated_at: string
           user_id: string
         }
@@ -64,10 +68,14 @@ export type Database = {
           installment_count?: number | null
           payment_source_id?: string | null
           payment_type: string
+          recurrence_id?: string | null
           recurring?: boolean | null
           recurring_end_date?: string | null
           recurring_interval?: string | null
+          related_expense_id?: string | null
+          time?: string | null
           title: string
+          total_installments?: number | null
           updated_at?: string
           user_id: string
         }
@@ -81,10 +89,14 @@ export type Database = {
           installment_count?: number | null
           payment_source_id?: string | null
           payment_type?: string
+          recurrence_id?: string | null
           recurring?: boolean | null
           recurring_end_date?: string | null
           recurring_interval?: string | null
+          related_expense_id?: string | null
+          time?: string | null
           title?: string
+          total_installments?: number | null
           updated_at?: string
           user_id?: string
         }

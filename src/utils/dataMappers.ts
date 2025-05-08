@@ -1,3 +1,4 @@
+
 import { Expense, ExpenseCategory, PaymentSource } from '@/types/models';
 import { DbCategory, DbExpense, DbPaymentSource } from '@/types/supabase';
 
@@ -23,18 +24,18 @@ export const mapDbExpenseToModel = (dbExpense: DbExpense): Expense => ({
   id: dbExpense.id,
   amount: dbExpense.amount,
   date: dbExpense.date,
-  time: dbExpense.date.split('T')[1]?.substring(0, 5) || '',
+  time: dbExpense.time || '',
   name: dbExpense.title, // DB uses 'title', frontend uses 'name'
   categoryId: dbExpense.category_id || '',
   paymentSourceId: dbExpense.payment_source_id || '',
   paymentType: dbExpense.payment_type as 'one-time' | 'installment' | 'recurring',
   user_id: dbExpense.user_id,
-  relatedExpenseId: undefined, // Field is missing in current DB schema
+  relatedExpenseId: dbExpense.related_expense_id || undefined,
   installmentNumber: dbExpense.installment_count,
-  totalInstallments: dbExpense.installment_count, // Total not in current schema, using same value
+  totalInstallments: dbExpense.total_installments,
   isInstallment: dbExpense.installment || false,
   isRecurring: dbExpense.recurring || false,
-  recurrenceId: undefined, // Field is missing in current DB schema
+  recurrenceId: dbExpense.recurrence_id || undefined,
   recurrenceType: dbExpense.recurring_interval as 'monthly' | undefined,
   createdAt: dbExpense.created_at,
   updatedAt: dbExpense.updated_at
@@ -50,13 +51,17 @@ export const mapModelToDbExpense = (expense: Expense, userId: string): Partial<D
     title: expense.name, // Frontend uses 'name', DB uses 'title'
     amount: Number(expense.amount), // Ensure it's a number
     date: expense.date,
-    category_id: expense.categoryId,
-    payment_source_id: expense.paymentSourceId,
+    time: expense.time || null,
+    category_id: expense.categoryId || null,
+    payment_source_id: expense.paymentSourceId || null,
     payment_type: expense.paymentType,
     installment: expense.isInstallment || false,
-    installment_count: expense.installmentNumber,
+    installment_count: expense.installmentNumber || null,
+    total_installments: expense.totalInstallments || null,
     recurring: expense.isRecurring || false,
-    recurring_interval: expense.recurrenceType,
+    recurring_interval: expense.recurrenceType || null,
+    recurrence_id: expense.recurrenceId || null,
+    related_expense_id: expense.relatedExpenseId || null,
     created_at: expense.createdAt || new Date().toISOString(),
     updated_at: expense.updatedAt || new Date().toISOString(),
     user_id: userId || expense.user_id, // Use provided userId or from the expense
