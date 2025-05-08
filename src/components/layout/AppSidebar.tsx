@@ -14,7 +14,7 @@ import {
   useSidebar
 } from "@/components/ui/sidebar";
 import { Link } from "react-router-dom";
-import { ChartPie, CreditCard, Plus, Settings, X } from "lucide-react";
+import { ChartPie, CreditCard, Menu, Plus, Settings, X } from "lucide-react";
 import { useRef, useEffect } from "react";
 import { useAppStore } from "@/store";
 import { calculateTotalExpenses } from "@/utils/expenseUtils";
@@ -88,57 +88,73 @@ export function AppSidebar() {
 
   const totalExpenses = calculateTotalExpenses(expenses);
 
-  return (
-    <Sidebar variant="floating" collapsible="offcanvas" ref={sidebarRef}>
-      <SidebarHeader className="p-4 flex justify-between items-center">
-        <h2 className="text-lg font-bold">ניהול תקציב</h2>
-        <SidebarTrigger className="h-8 w-8">
-          <X className="h-5 w-5" />
+  // Create a mobile menu button that will be shown when on mobile devices
+  const MobileMenuButton = () => {
+    if (!isMobile) return null;
+    
+    return (
+      <div className="fixed top-4 right-4 z-50 md:hidden">
+        <SidebarTrigger className="h-10 w-10 bg-primary text-primary-foreground rounded-full shadow-lg">
+          <Menu className="h-6 w-6" />
         </SidebarTrigger>
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <Link 
-                      to={item.url} 
-                      className="flex items-center gap-2"
-                      onClick={handleMenuItemClick}
-                    >
-                      <item.icon className="h-5 w-5" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+      </div>
+    );
+  };
 
-        <SidebarGroup>
-          <SidebarGroupLabel>סטטיסטיקה</SidebarGroupLabel>
-          <SidebarGroupContent className="p-3">
-            <div className="text-sm">
-              <div className="mb-2">
-                <span className="font-semibold">סה"כ הוצאות:</span> {totalExpenses.toLocaleString()} ₪
+  return (
+    <>
+      <MobileMenuButton />
+      <Sidebar variant="floating" collapsible="offcanvas" ref={sidebarRef}>
+        <SidebarHeader className="p-4 flex justify-between items-center">
+          <h2 className="text-lg font-bold">ניהול תקציב</h2>
+          <SidebarTrigger className="h-8 w-8">
+            <X className="h-5 w-5" />
+          </SidebarTrigger>
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {menuItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <Link 
+                        to={item.url} 
+                        className="flex items-center gap-2"
+                        onClick={handleMenuItemClick}
+                      >
+                        <item.icon className="h-5 w-5" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <SidebarGroup>
+            <SidebarGroupLabel>סטטיסטיקה</SidebarGroupLabel>
+            <SidebarGroupContent className="p-3">
+              <div className="text-sm">
+                <div className="mb-2">
+                  <span className="font-semibold">סה"כ הוצאות:</span> {totalExpenses.toLocaleString()} ₪
+                </div>
+                <div className="mb-2">
+                  <span className="font-semibold">קטגוריות:</span> {categories.length}
+                </div>
+                <div>
+                  <span className="font-semibold">אמצעי תשלום:</span> {paymentSources.length}
+                </div>
               </div>
-              <div className="mb-2">
-                <span className="font-semibold">קטגוריות:</span> {categories.length}
-              </div>
-              <div>
-                <span className="font-semibold">אמצעי תשלום:</span> {paymentSources.length}
-              </div>
-            </div>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-      <SidebarFooter className="p-3 text-xs text-center">
-        ניהול תקציב משפחתי | גרסה 1.0
-      </SidebarFooter>
-    </Sidebar>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+        <SidebarFooter className="p-3 text-xs text-center">
+          ניהול תקציב משפחתי | גרסה 1.0
+        </SidebarFooter>
+      </Sidebar>
+    </>
   );
 }
 

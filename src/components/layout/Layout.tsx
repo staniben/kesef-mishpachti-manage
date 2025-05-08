@@ -1,5 +1,5 @@
 
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { Outlet } from "react-router-dom";
 import { UserProfile } from "../UserProfile";
@@ -15,7 +15,6 @@ export function Layout() {
               <h1 className="text-2xl font-bold">ניהול תקציב משפחתי</h1>
               <div className="flex items-center gap-4">
                 <UserProfile />
-                <SidebarTrigger />
               </div>
             </div>
             <Outlet />
