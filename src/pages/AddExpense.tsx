@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { ExpenseForm } from "@/components/ExpenseForm";
 import { useAppStore } from "@/store";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { checkRlsAccess } from "@/integrations/supabase/client";
@@ -103,6 +103,7 @@ export default function AddExpense() {
     <div className="space-y-6">
       {error && (
         <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
           <AlertTitle>שגיאה</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
@@ -116,8 +117,18 @@ export default function AddExpense() {
             {rlsStatus === 'checking' && 'בודק הרשאות גישה...'}
             {rlsStatus === 'no-user' && 'יש להתחבר למערכת כדי לבדוק הרשאות'}
             {rlsStatus === 'mismatch' && 'זוהה חוסר התאמה בין זיהוי המשתמש למערכת ההרשאות'}
-            {rlsStatus === 'failed' && 'בדיקת הרשאות נכשלה - ייתכן שאין מדיניויות RLS מוגדרות'}
+            {rlsStatus === 'failed' && 'בדיקת הרשאות נכשלה - ייתכן שלא היו הרשאות RLS'}
             {rlsStatus === 'error' && 'אירעה שגיאה בבדיקת הרשאות'}
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {rlsStatus === 'ok' && (
+        <Alert className="bg-green-50 border-green-400 text-green-700">
+          <CheckCircle2 className="h-4 w-4 text-green-600" />
+          <AlertTitle>הרשאות גישה תקינות</AlertTitle>
+          <AlertDescription>
+            מדיניות האבטחה (RLS) הוגדרה כראוי ותואמת למשתמש המחובר
           </AlertDescription>
         </Alert>
       )}

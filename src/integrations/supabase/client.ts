@@ -38,7 +38,17 @@ export const checkRlsAccess = async () => {
   try {
     console.log("Testing RLS access...");
     
-    // Check if we can access the categories table
+    // First check if user is authenticated
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) {
+      console.error("User not authenticated:", userError);
+      return { 
+        success: false, 
+        error: userError || "No authenticated user found" 
+      };
+    }
+    
+    // Check if we can access the categories table (testing RLS)
     const { data: catData, error: catError } = await supabase
       .from('categories')
       .select('count(*)', { count: 'exact', head: true });
@@ -50,7 +60,7 @@ export const checkRlsAccess = async () => {
     
     console.log("RLS check for categories passed!");
     
-    // Check auth.uid()
+    // Check auth.uid() using our helper function
     const { data: authData, error: authError } = await supabase
       .rpc('get_auth_uid');
       
@@ -59,16 +69,15 @@ export const checkRlsAccess = async () => {
       return { success: false, error: authError };
     }
     
-    const { data: user } = await supabase.auth.getUser();
-    
+    // Log details for debugging
     console.log("Current auth.uid():", authData);
-    console.log("Current user.id:", user?.user?.id);
+    console.log("Current user.id:", userData.user.id);
     
     return {
       success: true, 
       auth_uid: authData,
-      user_id: user?.user?.id,
-      match: authData === user?.user?.id
+      user_id: userData.user.id,
+      match: authData === userData.user.id
     };
     
   } catch (e) {

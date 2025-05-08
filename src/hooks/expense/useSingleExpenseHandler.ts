@@ -3,24 +3,37 @@ import { Expense } from "@/types/models";
 import { createBaseExpense } from "@/utils/expenseUtils";
 import { ExpenseFormData } from "./expenseFormTypes";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/context/AuthContext"; // Import useAuth
+import { useAuth } from "@/context/AuthContext"; 
 import { checkRlsAccess } from "@/integrations/supabase/client";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 export function useSingleExpenseHandler() {
   const { toast } = useToast();
-  const { user } = useAuth(); // Get the current user from auth context
+  const { user } = useAuth(); 
 
-  const handleSingleExpense = (formData: ExpenseFormData, editId?: string) => {
+  const handleSingleExpense = async (formData: ExpenseFormData, editId?: string) => {
     console.log("Single expense handler called with user:", user?.id);
     console.log("Form data:", formData);
     
-    // First, test RLS access to help debug issues
-    checkRlsAccess().then(result => {
+    // Test RLS access before proceeding
+    try {
+      const result = await checkRlsAccess();
       console.log("RLS access check result:", result);
-    }).catch(err => {
+      
+      if (!result.success || !result.match) {
+        console.warn("RLS access check failed or user ID mismatch detected!");
+        toast({
+          title: "בדיקת הרשאות נכשלה",
+          description: "ייתכן שיש בעיה בהרשאות הגישה לנתונים. נא לרענן את הדף ולנסות שוב.",
+          variant: "warning",
+        });
+      }
+    } catch (err) {
       console.error("RLS access check failed:", err);
-    });
+      // Continue anyway, as this is just a diagnostic check
+    }
     
+    // Validate input data
     const totalAmount = parseFloat(formData.amount);
     if (isNaN(totalAmount) || totalAmount <= 0) {
       console.error("Invalid amount:", formData.amount);
@@ -43,7 +56,7 @@ export function useSingleExpenseHandler() {
     }
     
     try {
-      // Create the expense object
+      // Create the expense object with the authenticated user ID
       const expense: Expense = createBaseExpense(
         editId,
         totalAmount,
@@ -53,10 +66,19 @@ export function useSingleExpenseHandler() {
         formData.categoryId,
         formData.paymentSourceId,
         formData.paymentType,
-        user.id // Pass the user ID from auth
+        user.id
       );
       
       console.log("Created expense object:", expense);
+      console.log("Expense user_id:", expense.user_id);
+      console.log("Current auth user:", user.id);
+      
+      // Verify that user_id is correctly set for RLS policies
+      if (expense.user_id !== user.id) {
+        console.error("User ID mismatch! This will cause RLS policy failures");
+        throw new Error("שגיאת מערכת: אי התאמה במזהה משתמש");
+      }
+      
       return expense;
     } catch (err) {
       console.error("Error creating expense:", err);
