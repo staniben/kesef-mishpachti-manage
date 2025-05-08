@@ -88,22 +88,15 @@ export function AppSidebar() {
 
   const totalExpenses = calculateTotalExpenses(expenses);
 
-  // Create a mobile menu button that will be shown when on mobile devices
-  const MobileMenuButton = () => {
-    if (!isMobile) return null;
-    
-    return (
-      <div className="fixed top-4 right-4 z-50 md:hidden">
+  return (
+    <>
+      {/* Menu button visible on both mobile and desktop */}
+      <div className="fixed top-4 right-4 z-50">
         <SidebarTrigger className="h-10 w-10 bg-primary text-primary-foreground rounded-full shadow-lg">
           <Menu className="h-6 w-6" />
         </SidebarTrigger>
       </div>
-    );
-  };
 
-  return (
-    <>
-      <MobileMenuButton />
       <Sidebar variant="floating" collapsible="offcanvas" ref={sidebarRef}>
         <SidebarHeader className="p-4 flex justify-between items-center">
           <h2 className="text-lg font-bold">ניהול תקציב</h2>
@@ -180,3 +173,4 @@ function Category(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
