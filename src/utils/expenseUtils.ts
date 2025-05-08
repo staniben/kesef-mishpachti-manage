@@ -190,7 +190,7 @@ export const createBaseExpense = (
   categoryId: string, 
   paymentSourceId: string, 
   paymentType: string,
-  userId: string // Add userId parameter
+  userId: string
 ): Expense => {
   const now = new Date().toISOString();
   
@@ -211,6 +211,7 @@ export const createBaseExpense = (
 
 /**
  * Generate an array of recurring expenses
+ * Creates expenses for 12 months starting from the specified date
  */
 export const generateRecurringExpenses = (
   amount: number,
@@ -219,29 +220,37 @@ export const generateRecurringExpenses = (
   categoryId: string,
   paymentSourceId: string,
   time?: string,
-  userId: string = '' // Add userId parameter with default empty string
+  userId: string = ''
 ): Expense[] => {
   const now = new Date().toISOString();
   const recurrenceId = generateId();
+  const numberOfMonths = 12; // Generate expenses for 12 months
+  const expenses: Expense[] = [];
   
-  // For simplicity, we'll just generate one recurring expense
-  // In a real app, you would generate multiple instances or handle recurrence differently
-  return [{
-    id: generateId(),
-    amount: amount,
-    date: startDate.toISOString().split('T')[0],
-    time: time || '00:00',
-    name: name,
-    categoryId: categoryId,
-    paymentSourceId: paymentSourceId,
-    paymentType: 'recurring',
-    isRecurring: true,
-    recurrenceId: recurrenceId,
-    recurrenceType: 'monthly',
-    user_id: userId, // Use the provided userId parameter
-    createdAt: now,
-    updatedAt: now,
-  }];
+  for (let i = 0; i < numberOfMonths; i++) {
+    const expenseDate = addMonths(startDate, i);
+    
+    expenses.push({
+      id: generateId(),
+      amount: amount,
+      date: expenseDate.toISOString().split('T')[0],
+      time: time || '00:00',
+      name: `${name} (${i + 1}/${numberOfMonths})`,
+      categoryId: categoryId,
+      paymentSourceId: paymentSourceId,
+      paymentType: 'recurring',
+      isRecurring: true,
+      recurrenceId: recurrenceId, // Same recurrenceId to link all recurring expenses
+      recurrenceType: 'monthly',
+      installmentNumber: i + 1,
+      totalInstallments: numberOfMonths,
+      user_id: userId,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+  
+  return expenses;
 };
 
 /**
@@ -255,7 +264,7 @@ export const generateInstallmentExpenses = (
   categoryId: string,
   paymentSourceId: string,
   time?: string,
-  userId: string = '' // Add userId parameter with default empty string
+  userId: string = ''
 ): Expense[] => {
   const now = new Date().toISOString();
   const installmentAmount = totalAmount / numberOfInstallments;
@@ -276,7 +285,7 @@ export const generateInstallmentExpenses = (
       isInstallment: true,
       installmentNumber: i + 1,
       totalInstallments: numberOfInstallments,
-      user_id: userId, // Use the provided userId parameter
+      user_id: userId,
       createdAt: now,
       updatedAt: now,
     });

@@ -3,11 +3,11 @@ import { Expense, RecurrenceType } from "@/types/models";
 import { ExpenseFormData } from "./expenseFormTypes";
 import { generateRecurringExpenses } from "@/utils/expenseUtils";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/context/AuthContext"; // Import useAuth
+import { useAuth } from "@/context/AuthContext";
 
 export function useRecurringExpenseHandler() {
   const { toast } = useToast();
-  const { user } = useAuth(); // Get the current user from auth context
+  const { user } = useAuth();
 
   const handleRecurringExpense = (formData: ExpenseFormData) => {
     console.log("Recurring expense handler called with user:", user?.id);
@@ -40,6 +40,7 @@ export function useRecurringExpenseHandler() {
     }
     
     try {
+      // Generate recurring expenses for 12 months
       const expenses = generateRecurringExpenses(
         amount,
         formData.startDate,
@@ -47,7 +48,7 @@ export function useRecurringExpenseHandler() {
         formData.categoryId,
         formData.paymentSourceId,
         formData.time,
-        user.id // Pass the user ID from auth
+        user.id
       );
       
       console.log("Generated recurring expenses:", expenses);

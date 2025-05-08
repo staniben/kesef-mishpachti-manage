@@ -18,7 +18,7 @@ export function RecurringFields({
         onDateChange={onStartDateChange}
         onTimeChange={() => {}}
         label="תאריך התחלה"
-        dateLabel="תאריך התחלה (יחזור כל חודש במשך שנה)"
+        dateLabel="תאריך התחלה (יחזור כל חודש למשך שנה)"
         hideTime={true}
       />
     </div>
