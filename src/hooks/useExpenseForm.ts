@@ -215,7 +215,8 @@ export function useExpenseForm(editId?: string) {
         });
       } else {
         console.log('Handling single expense');
-        const expense = handleSingleExpense(formData, editId);
+        // Fixed: Properly await the Promise returned by handleSingleExpense
+        const expense = await handleSingleExpense(formData, editId);
         console.log('Single expense ready for saving:', expense);
         
         if (editId) {

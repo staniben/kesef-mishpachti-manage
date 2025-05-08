@@ -5,13 +5,12 @@ import { ExpenseFormData } from "./expenseFormTypes";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext"; 
 import { checkRlsAccess } from "@/integrations/supabase/client";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 export function useSingleExpenseHandler() {
   const { toast } = useToast();
   const { user } = useAuth(); 
 
-  const handleSingleExpense = async (formData: ExpenseFormData, editId?: string) => {
+  const handleSingleExpense = async (formData: ExpenseFormData, editId?: string): Promise<Expense> => {
     console.log("Single expense handler called with user:", user?.id);
     console.log("Form data:", formData);
     
