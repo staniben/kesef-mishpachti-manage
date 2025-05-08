@@ -203,7 +203,7 @@ export const expenseService = {
       const dbExpense = mapModelToDb(
         {
           ...expense,
-          id: expense.id || generateId(),
+          id: expense.id || crypto.randomUUID(), // Use proper UUID
         }, 
         userData.user.id
       );
@@ -289,7 +289,7 @@ export const expenseService = {
       const dbExpenses = newExpenses.map(expense => {
         const mappedExpense = mapModelToDb({
           ...expense,
-          id: expense.id || generateId(),
+          id: expense.id || crypto.randomUUID(), // Use proper UUID
         }, userData.user.id);
         
         // Add required fields to ensure each expense meets the DB requirements

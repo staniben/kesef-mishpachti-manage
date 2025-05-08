@@ -76,10 +76,10 @@ export const checkRlsAccess = async () => {
       }
     }
     
-    // Test INSERT capability on expenses to verify write access
+    // Test INSERT capability using a valid UUID instead of a string ID
     try {
       console.log("Testing INSERT capability for expenses...");
-      const testId = `test-${Date.now()}`;
+      const testId = crypto.randomUUID(); // Generate a proper UUID
       const { error: insertError } = await supabase
         .from('expenses')
         .insert({
