@@ -3,28 +3,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { generateId } from './mockData';
 import { mapDbExpenseToModel as mapDbToModel, mapModelToDbExpense as mapModelToDb } from '@/utils/dataMappers';
 
-// Helper function to map Supabase DB schema to our frontend model
-const mapDbExpenseToModel = (dbExpense: any): Expense => ({
-  id: dbExpense.id,
-  amount: dbExpense.amount,
-  date: dbExpense.date,
-  time: dbExpense.time || '',
-  name: dbExpense.title, // DB uses 'title', frontend uses 'name'
-  categoryId: dbExpense.category_id || '',
-  paymentSourceId: dbExpense.payment_source_id || '',
-  paymentType: dbExpense.payment_type,
-  user_id: dbExpense.user_id,
-  relatedExpenseId: dbExpense.related_expense_id,
-  installmentNumber: dbExpense.installment_count,
-  totalInstallments: dbExpense.total_installments,
-  isInstallment: dbExpense.installment || false,
-  isRecurring: dbExpense.recurring || false,
-  recurrenceId: dbExpense.recurrence_id,
-  recurrenceType: dbExpense.recurring_interval,
-  createdAt: dbExpense.created_at,
-  updatedAt: dbExpense.updated_at
-});
-
 // Validate expense data before it's sent to the database
 const validateExpenseForDB = (expense: Expense): string | null => {
   // Required fields validation
@@ -34,33 +12,6 @@ const validateExpenseForDB = (expense: Expense): string | null => {
   if (!expense.paymentType) return "סוג תשלום נדרש";
   
   return null; // No validation errors
-};
-
-// Helper function to map frontend model to Supabase DB schema
-const mapModelToDb = (expense: Expense, userId: string) => {
-  // Create a database-compatible object
-  const dbExpense = {
-    id: expense.id,
-    title: expense.name, // Frontend uses 'name', DB uses 'title'
-    amount: Number(expense.amount), // Ensure it's a number
-    date: expense.date,
-    time: expense.time,
-    category_id: expense.categoryId,
-    payment_source_id: expense.paymentSourceId,
-    payment_type: expense.paymentType,
-    related_expense_id: expense.relatedExpenseId,
-    installment: expense.isInstallment || false,
-    installment_count: expense.installmentNumber,
-    total_installments: expense.totalInstallments,
-    recurring: expense.isRecurring || false,
-    recurring_interval: expense.recurrenceType,
-    recurrence_id: expense.recurrenceId,
-    created_at: expense.createdAt || new Date().toISOString(),
-    updated_at: expense.updatedAt || new Date().toISOString(),
-    user_id: userId // Will be set in each method with the authenticated user's ID
-  };
-  
-  return dbExpense;
 };
 
 // Helper function to check RLS access
