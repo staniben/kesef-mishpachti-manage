@@ -13,83 +13,42 @@ export function StoreInitializer() {
   const [isFirstLoad, setIsFirstLoad] = useState(true);
   const [initializationAttempts, setInitializationAttempts] = useState(0);
   
-  // Debug function to check RLS access with more detailed information
-  const checkDetailedRlsAccess = async () => {
-    if (!user) return;
+  // Enhanced debugging information for RLS and authentication issues
+  const logAuthDebugInfo = (userId: string | undefined, sessionObj: any) => {
+    console.log("==== AUTH DEBUG INFO ====");
+    console.log(`User authenticated: ${!!userId}`);
+    console.log(`User ID: ${userId || 'MISSING'}`);
+    console.log(`Session present: ${!!sessionObj}`);
+    console.log(`Access token present: ${sessionObj?.access_token ? 'Yes' : 'No'}`);
     
-    try {
-      console.log("Testing RLS for expenses table specifically...");
-      const { data: expData, error: expError } = await supabase
-        .from('expenses')
-        .select('count(*)', { count: 'exact', head: true });
+    if (sessionObj) {
+      const expiresAt = sessionObj.expires_at;
+      const now = Math.floor(Date.now() / 1000);
+      const expiresInSeconds = expiresAt - now;
+      const expiresInMinutes = Math.floor(expiresInSeconds / 60);
       
-      if (expError) {
-        console.error("RLS check for expenses failed:", expError);
-        console.error("Error code:", expError.code);
-        console.error("Error message:", expError.message);
-        console.error("Error details:", expError.details);
-      } else {
-        console.log("RLS check for expenses passed! Access granted.");
+      console.log(`Session expires in: ${expiresInMinutes} minutes (${expiresInSeconds} seconds)`);
+      console.log(`Session expiry timestamp: ${new Date(expiresAt * 1000).toISOString()}`);
+      console.log(`Current time: ${new Date().toISOString()}`);
+      
+      if (expiresInMinutes < 10) {
+        console.warn("⚠️ WARNING: Session expires soon! This may cause data loading issues.");
       }
-      
-      // Test insert capability
-      console.log("Testing INSERT capability for expenses...");
-      const testId = `test-${Date.now()}`;
-      const { error: insertError } = await supabase
-        .from('expenses')
-        .insert({
-          id: testId,
-          title: 'Test Expense',
-          amount: 100,
-          date: new Date().toISOString(),
-          payment_type: 'one-time',
-          user_id: user.id
-        })
-        .select();
-      
-      if (insertError) {
-        console.error("INSERT test failed:", insertError);
-        console.error("Error code:", insertError.code);
-        console.error("Error message:", insertError.message);
-        console.error("Error details:", insertError.details);
-        
-        if (insertError.message.includes("policy")) {
-          console.error("This appears to be an RLS policy violation");
-        }
-      } else {
-        console.log("INSERT test successful!");
-        // Clean up test data
-        await supabase.from('expenses').delete().eq('id', testId);
-      }
-      
-      // Check user_id vs auth.uid()
-      const { data: authData, error: authError } = await supabase
-        .rpc('get_auth_uid');
-        
-      if (authError) {
-        console.error("Failed to get auth.uid():", authError);
-      } else {
-        console.log("Current auth.uid():", authData);
-        console.log("Stored user.id:", user.id);
-        console.log("Do they match?", authData === user.id);
-        
-        if (authData !== user.id) {
-          console.error("⚠️ CRITICAL ERROR: auth.uid() does not match user.id in frontend!");
-        }
-      }
-    } catch (e) {
-      console.error("Error checking RLS access:", e);
     }
+    console.log("========================");
   };
   
   // Initialize store with data from services
   useEffect(() => {
     // Only attempt to initialize when we have a definitive auth state
-    // This prevents trying to load when auth is still determining state
     if (isFirstLoad) {
       console.log("First load, checking auth state...");
       console.log("Auth state:", { user: !!user, session: !!session, isAuthenticated });
       setIsFirstLoad(false);
+      
+      if (user && session) {
+        logAuthDebugInfo(user.id, session);
+      }
     }
     
     if (!isAuthenticated || !user || !session) {
@@ -98,39 +57,57 @@ export function StoreInitializer() {
     }
     
     if (isInitialized) {
-      console.log("Store already initialized");
+      console.log("Store already initialized, skipping");
       return;
     }
 
     const initializeStore = async () => {
       try {
-        console.log("Initializing store with user:", user.id);
-        console.log("Auth session present:", !!session);
-        console.log("Session JWT:", session?.access_token ? "Present" : "Missing");
+        console.log(`[${new Date().toISOString()}] Initializing store with user:`, user.id);
+        
+        // Log detailed auth information
+        logAuthDebugInfo(user.id, session);
         
         // Ensure supabase client has correct auth token before proceeding
         if (!session?.access_token) {
           throw new Error("No access token available for authenticated requests");
         }
         
-        // Check RLS access before attempting to fetch data
-        await checkDetailedRlsAccess();
+        // Test RLS access comprehensively before attempting data fetch
+        console.log("Testing RLS access...");
+        const rlsStatus = await checkRlsAccess();
+        console.log("RLS access check result:", rlsStatus);
         
-        // First load categories and payment sources
-        console.log("Fetching categories...");
+        if (!rlsStatus.success) {
+          console.error("⚠️ RLS access check failed:", rlsStatus.message);
+          console.error("This might cause data loading issues.");
+          // Don't throw error here - try to load data anyway
+        }
+        
+        // Use a sequential loading approach with timing for debugging
+        // 1. First load categories
+        console.log(`[${new Date().toISOString()}] Fetching categories...`);
+        const categoriesStart = performance.now();
         await fetchCategories();
+        console.log(`Categories loaded in ${(performance.now() - categoriesStart).toFixed(2)}ms`);
         
-        console.log("Fetching payment sources...");
+        // 2. Then load payment sources
+        console.log(`[${new Date().toISOString()}] Fetching payment sources...`);
+        const sourcesStart = performance.now();
         await fetchPaymentSources();
+        console.log(`Payment sources loaded in ${(performance.now() - sourcesStart).toFixed(2)}ms`);
         
-        // Then load expenses which might reference them
-        console.log("Fetching expenses...");
+        // 3. Finally load expenses which might reference categories and payment sources
+        console.log(`[${new Date().toISOString()}] Fetching expenses...`);
+        const expensesStart = performance.now();
         await fetchExpenses();
+        console.log(`Expenses loaded in ${(performance.now() - expensesStart).toFixed(2)}ms`);
         
+        // All data loaded successfully
         setIsInitialized(true);
-        console.log("Store initialization complete");
+        console.log(`[${new Date().toISOString()}] Store initialization complete!`);
       } catch (error) {
-        console.error("Error initializing store:", error);
+        console.error(`[${new Date().toISOString()}] Error initializing store:`, error);
         
         // Track initialization attempts
         setInitializationAttempts(prev => prev + 1);
@@ -143,27 +120,50 @@ export function StoreInitializer() {
           
           if (error.message.includes("JWT") || error.message.includes("auth")) {
             errorMessage = "אירעה שגיאה באימות המשתמש, נא להתחבר מחדש";
+            
+            // Additional debugging for auth errors
+            logAuthDebugInfo(user?.id, session);
           } else if (error.message.includes("policy")) {
             errorMessage = "שגיאת הרשאות: אין גישה לנתונים. נא להתחבר מחדש";
             console.error("Possible RLS policy violation");
           }
         }
         
-        // After multiple failed attempts, show a more detailed error
+        // After multiple failed attempts, show a more detailed error and suggest actions
         if (initializationAttempts >= 2) {
-          errorMessage += " (ניסיון " + (initializationAttempts + 1) + ")";
+          errorMessage += ` (ניסיון ${initializationAttempts + 1})`;
+          
+          if (initializationAttempts === 2) {
+            errorMessage += " - נא לנסות להתחבר מחדש";
+          } else if (initializationAttempts >= 3) {
+            errorMessage += " - נא לנסות לנקות את המטמון (cache) ולהתחבר מחדש";
+          }
         }
         
-        // Fix: Use object structure for toast instead of string
+        // Show toast with error information
         toast({
           title: "שגיאה בטעינת נתונים",
           description: errorMessage,
           variant: "destructive",
         });
+        
+        // If we're having persistent auth issues after 3 attempts, force a sign-out
+        if (initializationAttempts >= 3 && 
+            error instanceof Error && 
+            (error.message.includes("JWT") || error.message.includes("auth"))) {
+          console.warn("Multiple auth failures detected, attempting to sign out and clear session");
+          // Don't actually force sign-out as it might confuse the user
+          // Just add a hint to do so
+          toast({
+            title: "בעיית אימות",
+            description: "מומלץ להתנתק מהמערכת ולהתחבר מחדש",
+            variant: "destructive",
+          });
+        }
       }
     };
     
-    console.log("Attempting to initialize store...");
+    console.log(`[${new Date().toISOString()}] Attempting to initialize store...`);
     initializeStore();
   }, [fetchCategories, fetchPaymentSources, fetchExpenses, toast, user, session, isAuthenticated, isInitialized, initializationAttempts]);
   

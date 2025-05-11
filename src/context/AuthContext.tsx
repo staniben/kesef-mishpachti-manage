@@ -1,7 +1,9 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { getBaseUrl, getPasswordResetRedirectUrl } from "@/utils/authUtils";
+import { storage } from "@/services/localStorage";
 
 interface AuthContextType {
   user: User | null;
@@ -14,6 +16,9 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
 }
+
+// Local storage key for persistence preference
+const PERSIST_SESSION_KEY = "auth_persist_session";
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
@@ -34,29 +39,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    console.log("Setting up auth state listener");
+    console.log(`[${new Date().toISOString()}] Setting up auth state listener`);
+    
+    // Get persistence preference from local storage
+    const persistSession = storage.get(PERSIST_SESSION_KEY, true);
+    console.log(`Session persistence preference: ${persistSession ? "Enabled" : "Disabled"}`);
     
     // Set up the auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
-        console.log("Auth state changed:", event);
+        console.log(`[${new Date().toISOString()}] Auth state changed: ${event}`);
         setSession(newSession);
         setUser(newSession?.user || null);
         setIsAuthenticated(!!newSession?.user);
         setIsLoading(false);
         
         if (newSession?.user) {
-          console.log("User authenticated:", newSession.user.id);
-          console.log("Access token present:", !!newSession.access_token);
-          console.log("Access token expires at:", new Date(newSession.expires_at * 1000).toISOString());
+          console.log(`User authenticated: ${newSession.user.id}`);
+          console.log(`Access token present: ${!!newSession.access_token}`);
           
-          // Let's check if the token will expire soon (within 10 minutes)
-          const expiresInMs = (newSession.expires_at * 1000) - Date.now();
-          const expiresInMinutes = Math.floor(expiresInMs / (1000 * 60));
-          console.log(`Token expires in ${expiresInMinutes} minutes`);
+          if (newSession.expires_at) {
+            const expiresAt = new Date(newSession.expires_at * 1000);
+            const expiresInMs = expiresAt.getTime() - Date.now();
+            const expiresInMinutes = Math.floor(expiresInMs / (1000 * 60));
+            console.log(`Session expires at: ${expiresAt.toISOString()} (in ${expiresInMinutes} minutes)`);
+            
+            if (expiresInMinutes < 10) {
+              console.warn("⚠️ Auth token expires soon! This might cause issues with requests.");
+            }
+          }
           
-          if (expiresInMinutes < 10) {
-            console.warn("⚠️ Auth token expires soon! This might cause issues with requests.");
+          // Log additional info to help debug token refresh issues
+          if (event === 'TOKEN_REFRESHED') {
+            console.log("Token was successfully refreshed");
           }
         } else {
           console.log("No authenticated user");
@@ -66,8 +81,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     // Get the initial session
-    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
-      console.log("Initial session check:", initialSession ? "Session found" : "No session");
+    supabase.auth.getSession().then(({ data: { session: initialSession }, error }) => {
+      if (error) {
+        console.error("Error getting initial session:", error);
+      }
+      
+      console.log(`[${new Date().toISOString()}] Initial session check:`, initialSession ? "Session found" : "No session");
       setSession(initialSession);
       setUser(initialSession?.user || null);
       setIsAuthenticated(!!initialSession?.user);
@@ -77,13 +96,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log("User authenticated:", initialSession.user.id);
         console.log("Initial access token present:", !!initialSession.access_token);
         
-        // Let's verify if the token still has reasonable validity
-        const expiresInMs = (initialSession.expires_at * 1000) - Date.now();
-        const expiresInMinutes = Math.floor(expiresInMs / (1000 * 60));
-        console.log(`Token expires in ${expiresInMinutes} minutes`);
-        
-        if (expiresInMinutes < 10) {
-          console.warn("⚠️ Auth token expires soon! This might cause issues with requests.");
+        if (initialSession.expires_at) {
+          // Let's verify if the token still has reasonable validity
+          const expiresInMs = (initialSession.expires_at * 1000) - Date.now();
+          const expiresInMinutes = Math.floor(expiresInMs / (1000 * 60));
+          console.log(`Token expires in ${expiresInMinutes} minutes`);
+          
+          if (expiresInMinutes < 10) {
+            console.warn("⚠️ Auth token expires soon! This might cause issues with requests.");
+          }
+          
+          // Force refresh token if it's going to expire soon
+          if (expiresInMinutes < 5) {
+            console.log("Token expiring soon, attempting to refresh...");
+            supabase.auth.refreshSession();
+          }
         }
         
         // Optional: Test a simple authenticated query to verify token works
@@ -111,7 +138,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string, persistSession = true) => {
     try {
-      console.log(`Signing in with persistence: ${persistSession}`);
+      console.log(`[${new Date().toISOString()}] Signing in with persistence: ${persistSession}`);
+      
+      // Save persistence preference
+      storage.set(PERSIST_SESSION_KEY, persistSession);
       
       // Configure storage based on persistence preference
       if (!persistSession) {
@@ -122,10 +152,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await supabase.auth.signOut();
         
         // Configure supabase client to use sessionStorage
-        supabase.auth.setSession({
-          access_token: '',
-          refresh_token: '',
-        });
+        // NOTE: We can't actually change the storage mechanism at runtime
+        // But we'll handle session cleanup on beforeunload if not persistent
       } else {
         console.log("Using localStorage for persistent auth session");
         // Default behavior uses localStorage
@@ -144,6 +172,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log("Sign in successful, session established:", !!data.session);
       console.log("User ID:", data.user?.id);
       console.log("Access token present:", !!data.session?.access_token);
+      
+      // If not using persistent sessions, set up a listener to clear on tab close/refresh
+      if (!persistSession) {
+        console.log("Setting up beforeunload handler for non-persistent session");
+        window.addEventListener('beforeunload', () => {
+          console.log("Page unloading, clearing non-persistent session");
+          // This doesn't actually trigger the signOut but marks our intent
+          localStorage.removeItem('supabase.auth.token');
+        });
+      }
       
       // Test if the auth state changed listener fired correctly
       setTimeout(() => {

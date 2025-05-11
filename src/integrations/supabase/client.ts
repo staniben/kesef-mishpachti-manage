@@ -18,6 +18,7 @@ type SupabaseClientWithRpc = ReturnType<typeof createClient<Database>> & {
   ): { data: RpcFunctionReturnTypes[T] | null; error: any };
 };
 
+// Create Supabase client with explicit persistence config
 export const supabase = createClient<Database>(
   SUPABASE_URL,
   SUPABASE_PUBLISHABLE_KEY,
@@ -25,8 +26,10 @@ export const supabase = createClient<Database>(
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      // Explicitly define storage mechanism for better cross-browser compatibility
+      // Explicitly use localStorage for persistent sessions
       storage: localStorage,
+      // Debug mode to help diagnose auth issues
+      debug: true
     }
   }
 ) as unknown as SupabaseClientWithRpc;
@@ -50,6 +53,7 @@ export const checkRlsAccess = async () => {
     }
     
     console.log("Authenticated user:", userData.user.id);
+    console.log("Auth session check:", await checkAuthSession());
     
     // Test multiple tables to find which one might be causing issues
     const tableNames = ['categories', 'expenses', 'payment_sources'] as const;
@@ -160,5 +164,37 @@ export const checkRlsAccess = async () => {
   } catch (e) {
     console.error("Error in checkRlsAccess:", e);
     return { success: false, error: e, message: "Error in RLS check function" };
+  }
+};
+
+/**
+ * Helper function to check current auth session status
+ */
+const checkAuthSession = async () => {
+  try {
+    const { data: sessionData, error } = await supabase.auth.getSession();
+    if (error) {
+      return { success: false, error };
+    }
+    
+    if (!sessionData.session) {
+      return { success: false, message: "No active session" };
+    }
+    
+    const expiresAt = sessionData.session.expires_at;
+    const now = Math.floor(Date.now() / 1000);
+    const expiresInSeconds = expiresAt - now;
+    const expiresInMinutes = Math.floor(expiresInSeconds / 60);
+    
+    return {
+      success: true,
+      session: sessionData.session,
+      expires_in: {
+        seconds: expiresInSeconds,
+        minutes: expiresInMinutes
+      }
+    };
+  } catch (e) {
+    return { success: false, error: e };
   }
 };

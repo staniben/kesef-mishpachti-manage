@@ -3,6 +3,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { Outlet } from "react-router-dom";
 import { UserProfile } from "../UserProfile";
+import { StoreInitializer } from "../StoreInitializer";
 
 export function Layout() {
   return (
@@ -21,6 +22,8 @@ export function Layout() {
           </div>
         </main>
       </div>
+      {/* Add StoreInitializer here to initialize the store on mount */}
+      <StoreInitializer />
     </SidebarProvider>
   );
 }

@@ -111,6 +111,13 @@ export default function Auth() {
         title: "התחברות בוצעה בהצלחה",
         description: "ברוך הבא למערכת",
       });
+      
+      // After successful login, let's do a quick page reload to ensure
+      // the application starts with a fresh state and session
+      // This helps avoid issues with stale session state
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1000);
     } catch (error) {
       console.error("Login error:", error);
       toast({
