@@ -1,9 +1,9 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, refreshSessionIfNeeded } from "@/integrations/supabase/client";
 import { getBaseUrl, getPasswordResetRedirectUrl } from "@/utils/authUtils";
 import { storage } from "@/services/localStorage";
+import { useAppStore } from "@/store";
 
 interface AuthContextType {
   user: User | null;
@@ -15,6 +15,7 @@ interface AuthContextType {
   updatePassword: (newPassword: string) => Promise<void>;
   isLoading: boolean;
   isAuthenticated: boolean;
+  refreshSession: () => Promise<boolean>;
 }
 
 // Local storage key for persistence preference
@@ -30,6 +31,7 @@ const AuthContext = createContext<AuthContextType>({
   updatePassword: async () => {},
   isLoading: true,
   isAuthenticated: false,
+  refreshSession: async () => false,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -37,6 +39,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { clearStore } = useAppStore();
+  
+  // Function to refresh session
+  const refreshSession = async (): Promise<boolean> => {
+    return await refreshSessionIfNeeded();
+  };
 
   useEffect(() => {
     console.log(`[${new Date().toISOString()}] Setting up auth state listener`);
@@ -49,34 +57,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
         console.log(`[${new Date().toISOString()}] Auth state changed: ${event}`);
+        
+        // Important: Handle the state update synchronously
         setSession(newSession);
         setUser(newSession?.user || null);
         setIsAuthenticated(!!newSession?.user);
         setIsLoading(false);
         
-        if (newSession?.user) {
-          console.log(`User authenticated: ${newSession.user.id}`);
-          console.log(`Access token present: ${!!newSession.access_token}`);
-          
-          if (newSession.expires_at) {
-            const expiresAt = new Date(newSession.expires_at * 1000);
-            const expiresInMs = expiresAt.getTime() - Date.now();
-            const expiresInMinutes = Math.floor(expiresInMs / (1000 * 60));
-            console.log(`Session expires at: ${expiresAt.toISOString()} (in ${expiresInMinutes} minutes)`);
-            
-            if (expiresInMinutes < 10) {
-              console.warn("⚠️ Auth token expires soon! This might cause issues with requests.");
-            }
-          }
-          
-          // Log additional info to help debug token refresh issues
-          if (event === 'TOKEN_REFRESHED') {
-            console.log("Token was successfully refreshed");
-          }
-        } else {
-          console.log("No authenticated user");
-          setIsAuthenticated(false);
+        // Handle sign out event to clear store
+        if (event === 'SIGNED_OUT') {
+          clearStore();
         }
+        
+        if (event === 'TOKEN_REFRESHED') {
+          console.log("Token was successfully refreshed");
+        }
+        
+        // Don't make any Supabase calls from this callback to avoid deadlocks!
       }
     );
 
@@ -87,46 +84,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       console.log(`[${new Date().toISOString()}] Initial session check:`, initialSession ? "Session found" : "No session");
+      
+      // Update state synchronously
       setSession(initialSession);
       setUser(initialSession?.user || null);
       setIsAuthenticated(!!initialSession?.user);
       setIsLoading(false);
       
       if (initialSession?.user) {
-        console.log("User authenticated:", initialSession.user.id);
-        console.log("Initial access token present:", !!initialSession.access_token);
-        
-        if (initialSession.expires_at) {
-          // Let's verify if the token still has reasonable validity
-          const expiresInMs = (initialSession.expires_at * 1000) - Date.now();
-          const expiresInMinutes = Math.floor(expiresInMs / (1000 * 60));
-          console.log(`Token expires in ${expiresInMinutes} minutes`);
-          
-          if (expiresInMinutes < 10) {
-            console.warn("⚠️ Auth token expires soon! This might cause issues with requests.");
-          }
-          
-          // Force refresh token if it's going to expire soon
-          if (expiresInMinutes < 5) {
-            console.log("Token expiring soon, attempting to refresh...");
-            supabase.auth.refreshSession();
-          }
-        }
-        
-        // Optional: Test a simple authenticated query to verify token works
-        supabase.from('categories')
-          .select('count(*)', { count: 'exact', head: true })
-          .then(({ count, error }) => {
-            if (error) {
-              console.error("Auth test query failed:", error);
-              if (error.message.includes("JWT") || error.message.includes("auth")) {
-                console.error("⚠️ Authentication appears invalid despite session!");
-                // Don't reset auth state here - that would cause a loop
-              }
-            } else {
-              console.log("Auth test query succeeded, user can access data");
+        // Additional checks done outside the callback
+        setTimeout(() => {
+          refreshSessionIfNeeded().then(isValid => {
+            if (!isValid) {
+              console.warn("Initial session validation failed, may need to re-authenticate");
             }
           });
+        }, 0);
       }
     });
 
@@ -134,30 +107,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log("Cleaning up auth state listener");
       subscription.unsubscribe();
     };
-  }, []);
+  }, [clearStore]);
 
   const signIn = async (email: string, password: string, persistSession = true) => {
     try {
       console.log(`[${new Date().toISOString()}] Signing in with persistence: ${persistSession}`);
       
-      // Save persistence preference
+      // Save persistence preference before signing in
       storage.set(PERSIST_SESSION_KEY, persistSession);
       
-      // Configure storage based on persistence preference
-      if (!persistSession) {
-        // Use sessionStorage for temporary sessions
-        console.log("Using sessionStorage for auth session");
-        
-        // This will clear any existing session
-        await supabase.auth.signOut();
-        
-        // Configure supabase client to use sessionStorage
-        // NOTE: We can't actually change the storage mechanism at runtime
-        // But we'll handle session cleanup on beforeunload if not persistent
-      } else {
-        console.log("Using localStorage for persistent auth session");
-        // Default behavior uses localStorage
-      }
+      // Clear any existing session first to avoid conflicts
+      await supabase.auth.signOut();
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -173,25 +133,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log("User ID:", data.user?.id);
       console.log("Access token present:", !!data.session?.access_token);
       
-      // If not using persistent sessions, set up a listener to clear on tab close/refresh
+      // For non-persistent sessions, set up cleanup
       if (!persistSession) {
-        console.log("Setting up beforeunload handler for non-persistent session");
         window.addEventListener('beforeunload', () => {
           console.log("Page unloading, clearing non-persistent session");
-          // This doesn't actually trigger the signOut but marks our intent
-          localStorage.removeItem('supabase.auth.token');
-        });
+          localStorage.removeItem('sb-pqkzybnagdobradtlwpq-auth-token');
+        }, { once: true });
       }
-      
-      // Test if the auth state changed listener fired correctly
-      setTimeout(() => {
-        if (!isAuthenticated) {
-          console.warn("⚠️ Auth state might not be updating correctly after sign in");
-        } else {
-          console.log("Auth state updated correctly after sign in");
-        }
-      }, 500);
-      
     } catch (error) {
       console.error("Sign in error:", error);
       throw error;
@@ -284,6 +232,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     updatePassword,
     isLoading,
     isAuthenticated,
+    refreshSession,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

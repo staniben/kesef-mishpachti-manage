@@ -1,171 +1,138 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAppStore } from "@/store";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
-import { supabase, checkRlsAccess } from "@/integrations/supabase/client";
+import { supabase, checkRlsAccess, refreshSessionIfNeeded, forceRefreshData } from "@/integrations/supabase/client";
 
 export function StoreInitializer() {
   const { toast } = useToast();
   const { user, session, isAuthenticated } = useAuth();
   const { fetchExpenses, fetchCategories, fetchPaymentSources } = useAppStore();
   const [isInitialized, setIsInitialized] = useState(false);
-  const [isFirstLoad, setIsFirstLoad] = useState(true);
+  const [isInitializing, setIsInitializing] = useState(false);
   const [initializationAttempts, setInitializationAttempts] = useState(0);
   
-  // Enhanced debugging information for RLS and authentication issues
-  const logAuthDebugInfo = (userId: string | undefined, sessionObj: any) => {
-    console.log("==== AUTH DEBUG INFO ====");
-    console.log(`User authenticated: ${!!userId}`);
-    console.log(`User ID: ${userId || 'MISSING'}`);
-    console.log(`Session present: ${!!sessionObj}`);
-    console.log(`Access token present: ${sessionObj?.access_token ? 'Yes' : 'No'}`);
+  // Create a memoized version of the initialization logic
+  const initializeStore = useCallback(async (forceRefresh = false) => {
+    if (isInitializing) return; // Prevent concurrent initialization
     
-    if (sessionObj) {
-      const expiresAt = sessionObj.expires_at;
-      const now = Math.floor(Date.now() / 1000);
-      const expiresInSeconds = expiresAt - now;
-      const expiresInMinutes = Math.floor(expiresInSeconds / 60);
+    try {
+      setIsInitializing(true);
       
-      console.log(`Session expires in: ${expiresInMinutes} minutes (${expiresInSeconds} seconds)`);
-      console.log(`Session expiry timestamp: ${new Date(expiresAt * 1000).toISOString()}`);
-      console.log(`Current time: ${new Date().toISOString()}`);
-      
-      if (expiresInMinutes < 10) {
-        console.warn("⚠️ WARNING: Session expires soon! This may cause data loading issues.");
+      if (!isAuthenticated || !user || !session) {
+        console.log("Skipping store initialization: No authenticated user");
+        return;
       }
-    }
-    console.log("========================");
-  };
-  
-  // Initialize store with data from services
-  useEffect(() => {
-    // Only attempt to initialize when we have a definitive auth state
-    if (isFirstLoad) {
-      console.log("First load, checking auth state...");
-      console.log("Auth state:", { user: !!user, session: !!session, isAuthenticated });
-      setIsFirstLoad(false);
       
-      if (user && session) {
-        logAuthDebugInfo(user.id, session);
-      }
-    }
-    
-    if (!isAuthenticated || !user || !session) {
-      console.log("Skipping store initialization: No authenticated user");
-      return;
-    }
-    
-    if (isInitialized) {
-      console.log("Store already initialized, skipping");
-      return;
-    }
-
-    const initializeStore = async () => {
-      try {
-        console.log(`[${new Date().toISOString()}] Initializing store with user:`, user.id);
-        
-        // Log detailed auth information
-        logAuthDebugInfo(user.id, session);
-        
-        // Ensure supabase client has correct auth token before proceeding
-        if (!session?.access_token) {
-          throw new Error("No access token available for authenticated requests");
-        }
-        
-        // Test RLS access comprehensively before attempting data fetch
-        console.log("Testing RLS access...");
-        const rlsStatus = await checkRlsAccess();
-        console.log("RLS access check result:", rlsStatus);
-        
-        if (!rlsStatus.success) {
-          console.error("⚠️ RLS access check failed:", rlsStatus.message);
-          console.error("This might cause data loading issues.");
-          // Don't throw error here - try to load data anyway
-        }
-        
-        // Use a sequential loading approach with timing for debugging
-        // 1. First load categories
-        console.log(`[${new Date().toISOString()}] Fetching categories...`);
-        const categoriesStart = performance.now();
-        await fetchCategories();
-        console.log(`Categories loaded in ${(performance.now() - categoriesStart).toFixed(2)}ms`);
-        
-        // 2. Then load payment sources
-        console.log(`[${new Date().toISOString()}] Fetching payment sources...`);
-        const sourcesStart = performance.now();
-        await fetchPaymentSources();
-        console.log(`Payment sources loaded in ${(performance.now() - sourcesStart).toFixed(2)}ms`);
-        
-        // 3. Finally load expenses which might reference categories and payment sources
-        console.log(`[${new Date().toISOString()}] Fetching expenses...`);
-        const expensesStart = performance.now();
-        await fetchExpenses();
-        console.log(`Expenses loaded in ${(performance.now() - expensesStart).toFixed(2)}ms`);
-        
-        // All data loaded successfully
-        setIsInitialized(true);
-        console.log(`[${new Date().toISOString()}] Store initialization complete!`);
-      } catch (error) {
-        console.error(`[${new Date().toISOString()}] Error initializing store:`, error);
-        
-        // Track initialization attempts
-        setInitializationAttempts(prev => prev + 1);
-        
-        // Get detailed error information
-        let errorMessage = "אירעה שגיאה בטעינת הנתונים, נא לרענן את הדף";
-        if (error instanceof Error) {
-          console.error("Error details:", error.message);
-          console.error("Error stack:", error.stack);
-          
-          if (error.message.includes("JWT") || error.message.includes("auth")) {
-            errorMessage = "אירעה שגיאה באימות המשתמש, נא להתחבר מחדש";
-            
-            // Additional debugging for auth errors
-            logAuthDebugInfo(user?.id, session);
-          } else if (error.message.includes("policy")) {
-            errorMessage = "שגיאת הרשאות: אין גישה לנתונים. נא להתחבר מחדש";
-            console.error("Possible RLS policy violation");
-          }
-        }
-        
-        // After multiple failed attempts, show a more detailed error and suggest actions
-        if (initializationAttempts >= 2) {
-          errorMessage += ` (ניסיון ${initializationAttempts + 1})`;
-          
-          if (initializationAttempts === 2) {
-            errorMessage += " - נא לנסות להתחבר מחדש";
-          } else if (initializationAttempts >= 3) {
-            errorMessage += " - נא לנסות לנקות את המטמון (cache) ולהתחבר מחדש";
-          }
-        }
-        
-        // Show toast with error information
+      console.log(`[${new Date().toISOString()}] Initializing store with user:`, user.id);
+      
+      // Ensure token is fresh before proceeding
+      const isSessionValid = await refreshSessionIfNeeded();
+      if (!isSessionValid) {
         toast({
-          title: "שגיאה בטעינת נתונים",
-          description: errorMessage,
+          title: "בעיית אימות",
+          description: "יש בעיה עם תוקף האימות, נא להתחבר מחדש",
           variant: "destructive",
         });
-        
-        // If we're having persistent auth issues after 3 attempts, force a sign-out
-        if (initializationAttempts >= 3 && 
-            error instanceof Error && 
-            (error.message.includes("JWT") || error.message.includes("auth"))) {
-          console.warn("Multiple auth failures detected, attempting to sign out and clear session");
-          // Don't actually force sign-out as it might confuse the user
-          // Just add a hint to do so
-          toast({
-            title: "בעיית אימות",
-            description: "מומלץ להתנתק מהמערכת ולהתחבר מחדש",
-            variant: "destructive",
-          });
+        return;
+      }
+      
+      // If forceRefresh is true, clear any cached data
+      if (forceRefresh) {
+        await forceRefreshData();
+      }
+      
+      // Sequential data loading with timing and retries
+      // 1. First load categories
+      console.log(`[${new Date().toISOString()}] Fetching categories...`);
+      const categoriesStart = performance.now();
+      try {
+        await fetchCategories();
+        console.log(`Categories loaded in ${(performance.now() - categoriesStart).toFixed(2)}ms`);
+      } catch (error) {
+        console.error("Failed to load categories, retrying once:", error);
+        // Retry once after a short delay
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await fetchCategories();
+      }
+      
+      // 2. Then load payment sources
+      console.log(`[${new Date().toISOString()}] Fetching payment sources...`);
+      const sourcesStart = performance.now();
+      try {
+        await fetchPaymentSources();
+        console.log(`Payment sources loaded in ${(performance.now() - sourcesStart).toFixed(2)}ms`);
+      } catch (error) {
+        console.error("Failed to load payment sources, retrying once:", error);
+        // Retry once after a short delay
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await fetchPaymentSources();
+      }
+      
+      // 3. Finally load expenses
+      console.log(`[${new Date().toISOString()}] Fetching expenses...`);
+      const expensesStart = performance.now();
+      try {
+        await fetchExpenses();
+        console.log(`Expenses loaded in ${(performance.now() - expensesStart).toFixed(2)}ms`);
+      } catch (error) {
+        console.error("Failed to load expenses, retrying once:", error);
+        // Retry once after a short delay
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await fetchExpenses();
+      }
+      
+      // All data loaded successfully
+      setIsInitialized(true);
+      console.log(`[${new Date().toISOString()}] Store initialization complete!`);
+    } catch (error) {
+      console.error(`[${new Date().toISOString()}] Error initializing store:`, error);
+      setInitializationAttempts(prev => prev + 1);
+      
+      let errorMessage = "אירעה שגיאה בטעינת הנתונים, נא לרענן את הדף";
+      if (error instanceof Error) {
+        if (error.message.includes("JWT") || error.message.includes("auth")) {
+          errorMessage = "אירעה שגיאה באימות המשתמש, נא להתחבר מחדש";
+        } else if (error.message.includes("policy")) {
+          errorMessage = "שגיאת הרשאות: אין גישה לנתונים. נא להתחבר מחדש";
         }
+      }
+      
+      if (initializationAttempts >= 2) {
+        errorMessage += ` (ניסיון ${initializationAttempts + 1})`;
+      }
+      
+      toast({
+        title: "שגיאה בטעינת נתונים",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsInitializing(false);
+    }
+  }, [fetchCategories, fetchPaymentSources, fetchExpenses, toast, user, session, isAuthenticated, initializationAttempts, isInitializing]);
+  
+  // Initialize store when auth state changes
+  useEffect(() => {
+    if (isAuthenticated && user && session && !isInitialized && !isInitializing) {
+      console.log(`[${new Date().toISOString()}] Auth state detected, initializing store...`);
+      initializeStore();
+    }
+  }, [isAuthenticated, user, session, isInitialized, isInitializing, initializeStore]);
+  
+  // Set up a visibility change listener to re-fetch data when tab becomes active
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isAuthenticated && isInitialized) {
+        console.log("Document became visible, refreshing data...");
+        initializeStore(true);
       }
     };
     
-    console.log(`[${new Date().toISOString()}] Attempting to initialize store...`);
-    initializeStore();
-  }, [fetchCategories, fetchPaymentSources, fetchExpenses, toast, user, session, isAuthenticated, isInitialized, initializationAttempts]);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isAuthenticated, isInitialized, initializeStore]);
   
   // This is a null component that just initializes the store
   return null;

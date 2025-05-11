@@ -40,6 +40,10 @@ interface StoreState {
   setTheme: (theme: ThemeType) => void;
   setCurrentMonth: (month: number) => void;
   setCurrentYear: (year: number) => void;
+  
+  // Actions - Data Management
+  refreshAllData: () => Promise<void>;
+  clearStore: () => void;
 }
 
 export const useAppStore = create<StoreState>()(
@@ -234,6 +238,32 @@ export const useAppStore = create<StoreState>()(
       setCurrentYear: (year) => {
         set({ currentYear: year });
       },
+      
+      // New data management actions
+      refreshAllData: async () => {
+        console.log("Refreshing all data from server...");
+        try {
+          // Fetch all data in parallel for faster refresh
+          await Promise.all([
+            get().fetchCategories(),
+            get().fetchPaymentSources(),
+            get().fetchExpenses()
+          ]);
+          console.log("All data refreshed successfully");
+        } catch (error) {
+          console.error("Error refreshing data:", error);
+          throw error;
+        }
+      },
+      
+      clearStore: () => {
+        console.log("Clearing store state");
+        set({
+          expenses: [],
+          categories: [],
+          paymentSources: []
+        });
+      }
     }),
     {
       name: 'expense-tracker-store'

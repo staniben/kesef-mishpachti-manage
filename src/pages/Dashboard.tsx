@@ -1,22 +1,38 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MonthSelector } from "@/components/MonthSelector";
 import { ExpenseChart } from "@/components/ExpenseChart";
 import { ExpensesList } from "@/components/ExpensesList";
 import { Button } from "@/components/ui/button";
-import { Plus, FileDown } from "lucide-react";
+import { Plus, FileDown, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAppStore } from "@/store";
 import { exportToExcel } from "@/utils/exportUtils";
 import { filterExpensesByMonth } from "@/utils/expenseUtils";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [filterId, setFilterId] = useState<string | undefined>();
   const [filterType, setFilterType] = useState<"category" | "source" | undefined>();
-  const { expenses, categories, paymentSources, currentMonth, currentYear } = useAppStore();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { expenses, categories, paymentSources, currentMonth, currentYear, refreshAllData } = useAppStore();
+  const { user, refreshSession } = useAuth();
+  
+  // Initial data loading check
+  useEffect(() => {
+    const checkDataLoaded = async () => {
+      // If we have a user but no data, try refreshing
+      if (user && (!expenses.length || !categories.length || !paymentSources.length)) {
+        console.log("User authenticated but data missing, refreshing...");
+        await handleRefreshData();
+      }
+    };
+    
+    checkDataLoaded();
+  }, [user]);  // Only run when user changes
   
   const handleChartSliceClick = (id: string, type: "category" | "source") => {
     setFilterId(id);
@@ -74,11 +90,42 @@ export default function Dashboard() {
     });
   };
   
+  // New function to manually refresh data
+  const handleRefreshData = async () => {
+    try {
+      setIsRefreshing(true);
+      
+      // First refresh the auth session to ensure token validity
+      await refreshSession();
+      
+      // Then refresh all data
+      await refreshAllData();
+      
+      toast({
+        title: "הנתונים רועננו",
+        description: "הנתונים עודכנו בהצלחה",
+      });
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+      toast({
+        title: "שגיאה בריענון הנתונים",
+        description: "אירעה שגיאה בעת ריענון הנתונים",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+  
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap justify-between items-center gap-4">
         <h1 className="text-3xl font-bold">דשבורד</h1>
         <div className="flex gap-2">
+          <Button onClick={handleRefreshData} variant="outline" disabled={isRefreshing}>
+            <RefreshCw className={`h-4 w-4 ml-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'מרענן...' : 'רענן נתונים'}
+          </Button>
           <Button onClick={handleExportToExcel} variant="outline">
             <FileDown className="h-4 w-4 ml-2" />
             ייצוא לאקסל
