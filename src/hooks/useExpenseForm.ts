@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -10,7 +11,17 @@ import { useRecurringExpenseHandler } from "./expense/useRecurringExpenseHandler
 import { useAppStore } from "@/store";
 import { useAuth } from "@/context/AuthContext";
 
-export function useExpenseForm(editId?: string) {
+interface InitialData {
+  paymentType?: PaymentType;
+  name?: string;
+  amount?: string;
+  categoryId?: string;
+  paymentSourceId?: string;
+  totalAmount?: string;
+  numberOfInstallments?: string;
+}
+
+export function useExpenseForm(editId?: string, initialData?: InitialData) {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -42,6 +53,45 @@ export function useExpenseForm(editId?: string) {
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Apply initialData if provided
+  useEffect(() => {
+    if (initialData && !editId) {
+      const updatedFormData = { ...formData };
+      
+      if (initialData.paymentType && ["one-time", "installment", "recurring"].includes(initialData.paymentType)) {
+        updatedFormData.paymentType = initialData.paymentType;
+      }
+      
+      if (initialData.name) {
+        updatedFormData.name = initialData.name;
+      }
+      
+      if (initialData.amount) {
+        updatedFormData.amount = initialData.amount;
+      }
+      
+      if (initialData.categoryId && categories.some(c => c.id === initialData.categoryId)) {
+        updatedFormData.categoryId = initialData.categoryId;
+      }
+      
+      if (initialData.paymentSourceId && paymentSources.some(p => p.id === initialData.paymentSourceId)) {
+        updatedFormData.paymentSourceId = initialData.paymentSourceId;
+      }
+      
+      if (initialData.totalAmount && initialData.paymentType === 'installment') {
+        updatedFormData.totalAmount = initialData.totalAmount;
+      }
+      
+      if (initialData.numberOfInstallments && initialData.paymentType === 'installment') {
+        updatedFormData.numberOfInstallments = initialData.numberOfInstallments;
+      }
+      
+      setFormData(updatedFormData);
+      
+      console.log("ExpenseForm initialized with URL parameters:", initialData);
+    }
+  }, [initialData, categories, paymentSources, editId]);
   
   // Load expense data if editing
   useEffect(() => {

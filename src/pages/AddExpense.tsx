@@ -7,6 +7,8 @@ import { useAuth } from "@/context/AuthContext";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { checkRlsAccess } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useSearchParams } from "react-router-dom";
+import { PaymentType } from "@/types";
 
 export default function AddExpense() {
   const { categories, paymentSources, fetchCategories, fetchPaymentSources } = useAppStore();
@@ -16,6 +18,18 @@ export default function AddExpense() {
   const [rlsStatus, setRlsStatus] = useState<string>('checking');
   const [rlsDetails, setRlsDetails] = useState<any>(null);
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  
+  // Extract query parameters for pre-filling the form
+  const initialFormData = {
+    paymentType: searchParams.get("type") as PaymentType || undefined,
+    name: searchParams.get("name") || undefined,
+    amount: searchParams.get("amount") || undefined,
+    categoryId: searchParams.get("categoryId") || undefined,
+    paymentSourceId: searchParams.get("paymentSourceId") || undefined,
+    totalAmount: searchParams.get("totalAmount") || undefined,
+    numberOfInstallments: searchParams.get("numberOfInstallments") || undefined,
+  };
 
   // Check RLS policies on component mount
   useEffect(() => {
@@ -318,7 +332,7 @@ export default function AddExpense() {
             </Alert>
           )}
           
-          <ExpenseForm />
+          <ExpenseForm initialData={initialFormData} />
         </>
       )}
     </div>

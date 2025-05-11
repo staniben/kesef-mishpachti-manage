@@ -7,12 +7,22 @@ import { PaymentTypeSelector } from "./expense/PaymentTypeSelector";
 import { InstallmentFields } from "./expense/InstallmentFields";
 import { RecurringFields } from "./expense/RecurringFields";
 import { useExpenseForm } from "@/hooks/useExpenseForm";
+import { PaymentType } from "@/types";
 
 interface ExpenseFormProps {
   editId?: string;
+  initialData?: {
+    paymentType?: PaymentType;
+    name?: string;
+    amount?: string;
+    categoryId?: string;
+    paymentSourceId?: string;
+    totalAmount?: string;
+    numberOfInstallments?: string;
+  };
 }
 
-export function ExpenseForm({ editId }: ExpenseFormProps) {
+export function ExpenseForm({ editId, initialData }: ExpenseFormProps) {
   const {
     formData,
     isSubmitting,
@@ -24,7 +34,7 @@ export function ExpenseForm({ editId }: ExpenseFormProps) {
     handleStartDateChange,
     handlePaymentTypeChange,
     handleSubmit
-  } = useExpenseForm(editId);
+  } = useExpenseForm(editId, initialData);
   
   return (
     <form onSubmit={handleSubmit} className="space-y-6 bg-card p-6 rounded-lg shadow-sm">

@@ -14,7 +14,7 @@ import {
   useSidebar
 } from "@/components/ui/sidebar";
 import { Link } from "react-router-dom";
-import { ChartPie, CreditCard, Menu, Plus, Settings, X } from "lucide-react";
+import { ChartPie, CreditCard, Menu, Plus, Settings, X, Calendar, Repeat } from "lucide-react";
 import { useRef, useEffect } from "react";
 import { useAppStore } from "@/store";
 import { calculateTotalExpenses } from "@/utils/expenseUtils";
@@ -58,7 +58,7 @@ export function AppSidebar() {
     }
   };
 
-  const menuItems = [
+  const mainMenuItems = [
     {
       title: "דשבורד",
       url: "/",
@@ -86,6 +86,24 @@ export function AppSidebar() {
     },
   ];
 
+  const expenseTypes = [
+    {
+      title: "הוצאה חד פעמית",
+      url: "/add-expense?type=one-time",
+      icon: Plus,
+    },
+    {
+      title: "תשלומים",
+      url: "/add-expense?type=installment",
+      icon: Calendar,
+    },
+    {
+      title: "הוצאה קבועה",
+      url: "/add-expense?type=recurring",
+      icon: Repeat,
+    },
+  ];
+
   const totalExpenses = calculateTotalExpenses(expenses);
 
   return (
@@ -108,7 +126,29 @@ export function AppSidebar() {
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu>
-                {menuItems.map((item) => (
+                {mainMenuItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <Link 
+                        to={item.url} 
+                        className="flex items-center gap-2"
+                        onClick={handleMenuItemClick}
+                      >
+                        <item.icon className="h-5 w-5" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <SidebarGroup>
+            <SidebarGroupLabel>סוגי הוצאות</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {expenseTypes.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild>
                       <Link 
@@ -173,4 +213,3 @@ function Category(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
-
