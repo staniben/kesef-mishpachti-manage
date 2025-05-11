@@ -1,10 +1,10 @@
-
 import { create } from 'zustand';
 import { Expense, ExpenseCategory, PaymentSource, ThemeType } from '@/types/models';
 import { expenseService } from '@/services/expenseService';
 import { categoryService } from '@/services/categoryService';
 import { paymentSourceService } from '@/services/paymentSourceService';
 import { devtools } from 'zustand/middleware';
+import { storage } from '@/services/localStorage';
 
 // Data status type to track loading state
 type DataStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -22,6 +22,7 @@ interface StoreState {
   currentMonth: number;
   currentYear: number;
   theme: ThemeType;
+  financialMonthStartDay: number; // New field for financial month start day
   
   // Actions - Data Status
   setStoreDataStatus: (status: DataStatus) => void;
@@ -49,11 +50,17 @@ interface StoreState {
   setTheme: (theme: ThemeType) => void;
   setCurrentMonth: (month: number) => void;
   setCurrentYear: (year: number) => void;
+  setFinancialMonthStartDay: (day: number) => void; // New action to set financial month start day
   
   // Actions - Data Management
   refreshAllData: () => Promise<void>;
   clearStore: () => void;
 }
+
+// Get financial month start day from storage or use default (11)
+const getInitialFinancialMonthStartDay = (): number => {
+  return storage.get<number>('financialMonthStartDay', 11);
+};
 
 export const useAppStore = create<StoreState>()(
   devtools(
@@ -63,9 +70,10 @@ export const useAppStore = create<StoreState>()(
       categories: [],
       paymentSources: [],
       dataStatus: 'idle',
-      currentMonth: new Date().getMonth(),
-      currentYear: new Date().getFullYear(),
+      currentMonth: new Date().getMonth(), // Will be adjusted based on financial month
+      currentYear: new Date().getFullYear(), // Will be adjusted based on financial month
       theme: 'default',
+      financialMonthStartDay: getInitialFinancialMonthStartDay(), // Initialize from storage
       
       // Data status actions
       setStoreDataStatus: (status) => {
@@ -245,6 +253,8 @@ export const useAppStore = create<StoreState>()(
       // App settings actions
       setTheme: (theme) => {
         set({ theme });
+        // Save to storage
+        storage.set('theme', theme);
       },
       
       setCurrentMonth: (month) => {
@@ -253,6 +263,14 @@ export const useAppStore = create<StoreState>()(
       
       setCurrentYear: (year) => {
         set({ currentYear: year });
+      },
+      
+      setFinancialMonthStartDay: (day) => {
+        // Validate day is between 1 and 31
+        const validDay = Math.min(Math.max(1, day), 31);
+        set({ financialMonthStartDay: validDay });
+        // Save to storage
+        storage.set('financialMonthStartDay', validDay);
       },
       
       // New data management actions

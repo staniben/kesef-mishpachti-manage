@@ -9,13 +9,20 @@ import { useAppStore } from "@/store";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
+import { storage } from "@/services/localStorage";
 
 export function Layout() {
   const [visibilityChanged, setVisibilityChanged] = useState(false);
-  const { refreshAllData, dataStatus, categories, paymentSources } = useAppStore();
+  const { refreshAllData, dataStatus, categories, paymentSources, setTheme } = useAppStore();
   const { isAuthenticated } = useAuth();
   const [hasInitialData, setHasInitialData] = useState(false);
   const [initialLoadAttempt, setInitialLoadAttempt] = useState(0);
+  
+  // Load theme from storage on initialization
+  useEffect(() => {
+    const savedTheme = storage.get('theme', 'default');
+    setTheme(savedTheme);
+  }, []);
   
   // Check if required data is available for child routes
   const isDataReady = categories.length > 0 && paymentSources.length > 0;

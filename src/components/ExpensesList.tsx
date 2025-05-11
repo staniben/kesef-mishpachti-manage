@@ -13,22 +13,38 @@ type ExpensesListProps = {
 };
 
 export function ExpensesList({ filterId, filterType, onEditExpense }: ExpensesListProps) {
-  const { expenses, categories, paymentSources, currentMonth, currentYear, deleteExpense } = useAppStore();
+  const { 
+    expenses, 
+    categories, 
+    paymentSources, 
+    currentMonth, 
+    currentYear, 
+    financialMonthStartDay, 
+    deleteExpense 
+  } = useAppStore();
   
-  // Filter expenses for current month and optional filter by category or source
+  // Filter expenses for current financial month and optional filter by category or source
   const filteredExpenses = expenses.filter(expense => {
-    const date = new Date(expense.date);
-    const monthMatches = date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+    // First filter by the financial month
+    const expenseDate = new Date(expense.date);
     
-    if (!filterId) return monthMatches;
+    // Calculate financial month boundaries
+    const startDate = new Date(currentYear, currentMonth, financialMonthStartDay);
+    const endDate = new Date(currentYear, currentMonth + 1, financialMonthStartDay);
+    
+    // Check if within financial month
+    const isInFinancialMonth = expenseDate >= startDate && expenseDate < endDate;
+    
+    // Then apply category or source filter if provided
+    if (!filterId) return isInFinancialMonth;
     
     if (filterType === "category") {
-      return monthMatches && expense.categoryId === filterId;
+      return isInFinancialMonth && expense.categoryId === filterId;
     } else if (filterType === "source") {
-      return monthMatches && expense.paymentSourceId === filterId;
+      return isInFinancialMonth && expense.paymentSourceId === filterId;
     }
     
-    return monthMatches;
+    return isInFinancialMonth;
   });
   
   // Sort expenses by date (newest first)
@@ -57,7 +73,7 @@ export function ExpensesList({ filterId, filterType, onEditExpense }: ExpensesLi
     return (
       <div className="text-center p-8 bg-card rounded-lg shadow-sm">
         <h3 className="text-xl font-medium mb-4">אין הוצאות להצגה</h3>
-        <p className="text-muted-foreground">לא נמצאו הוצאות בחודש הנוכחי</p>
+        <p className="text-muted-foreground">לא נמצאו הוצאות בחודש הפיננסי הנוכחי</p>
       </div>
     );
   }

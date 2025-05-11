@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAppStore } from "@/store";
 import { exportToExcel } from "@/utils/exportUtils";
-import { filterExpensesByMonth } from "@/utils/expenseUtils";
+import { filterExpensesByMonth, getCurrentFinancialMonth } from "@/utils/expenseUtils";
 import { useAuth } from "@/context/AuthContext";
 
 export default function Dashboard() {
@@ -18,8 +18,30 @@ export default function Dashboard() {
   const [filterId, setFilterId] = useState<string | undefined>();
   const [filterType, setFilterType] = useState<"category" | "source" | undefined>();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { expenses, categories, paymentSources, currentMonth, currentYear, refreshAllData } = useAppStore();
+  const { 
+    expenses, 
+    categories, 
+    paymentSources, 
+    currentMonth, 
+    currentYear, 
+    financialMonthStartDay, 
+    setCurrentMonth, 
+    setCurrentYear,
+    refreshAllData 
+  } = useAppStore();
   const { user, refreshSession } = useAuth();
+  
+  // Set the initial financial month when the dashboard loads
+  useEffect(() => {
+    // Get the current financial month based on today's date and financial month start day
+    const { month, year } = getCurrentFinancialMonth(financialMonthStartDay);
+    
+    // Only update if different to avoid unnecessary re-renders
+    if (month !== currentMonth || year !== currentYear) {
+      setCurrentMonth(month);
+      setCurrentYear(year);
+    }
+  }, [financialMonthStartDay]); // Re-run if financial month start day changes
   
   // Initial data loading check
   useEffect(() => {
@@ -53,12 +75,17 @@ export default function Dashboard() {
   };
   
   const handleExportToExcel = () => {
-    const monthlyExpenses = filterExpensesByMonth(expenses, currentMonth, currentYear);
+    const monthlyExpenses = filterExpensesByMonth(
+      expenses, 
+      currentMonth, 
+      currentYear,
+      financialMonthStartDay
+    );
     
     if (monthlyExpenses.length === 0) {
       toast({
         title: "אין נתונים להורדה",
-        description: "לא נמצאו הוצאות בחודש הנבחר",
+        description: "לא נמצאו הוצאות בחודש הפיננסי הנבחר",
         variant: "destructive",
       });
       return;
@@ -90,7 +117,7 @@ export default function Dashboard() {
     });
   };
   
-  // New function to manually refresh data
+  // Function to manually refresh data
   const handleRefreshData = async () => {
     try {
       setIsRefreshing(true);

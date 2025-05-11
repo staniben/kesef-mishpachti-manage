@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useAppStore } from "@/store";
+import { formatFinancialMonthRange } from "@/utils/expenseUtils";
 
 export function MonthSelector() {
-  const { currentMonth, currentYear, setCurrentMonth, setCurrentYear } = useAppStore();
+  const { currentMonth, currentYear, financialMonthStartDay, setCurrentMonth, setCurrentYear } = useAppStore();
   
   const months = [
     'ינואר', 'פברואר', 'מרץ', 'אפריל', 
@@ -36,49 +37,59 @@ export function MonthSelector() {
     }
   };
 
+  // Get formatted financial month range (e.g. "May 11 - Jun 10")
+  const financialMonthRange = formatFinancialMonthRange(currentMonth, currentYear, financialMonthStartDay);
+
   return (
-    <div className="flex items-center justify-between bg-card shadow-sm rounded-lg p-2 mb-6">
-      <Button variant="ghost" size="icon" onClick={handlePrevMonth} className="rtl-flip">
-        <ChevronLeft className="h-5 w-5" />
-      </Button>
-      
-      <div className="flex gap-2">
-        <Select
-          value={currentMonth.toString()}
-          onValueChange={(value) => setCurrentMonth(parseInt(value))}
-        >
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder={months[currentMonth]} />
-          </SelectTrigger>
-          <SelectContent>
-            {months.map((month, index) => (
-              <SelectItem key={month} value={index.toString()}>
-                {month}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+    <div className="flex flex-col space-y-2">
+      <div className="flex items-center justify-between bg-card shadow-sm rounded-lg p-2 mb-2">
+        <Button variant="ghost" size="icon" onClick={handlePrevMonth} className="rtl-flip">
+          <ChevronLeft className="h-5 w-5" />
+        </Button>
         
-        <Select
-          value={currentYear.toString()}
-          onValueChange={(value) => setCurrentYear(parseInt(value))}
-        >
-          <SelectTrigger className="w-[120px]">
-            <SelectValue placeholder={currentYear.toString()} />
-          </SelectTrigger>
-          <SelectContent>
-            {years.map((year) => (
-              <SelectItem key={year} value={year.toString()}>
-                {year}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex gap-2">
+          <Select
+            value={currentMonth.toString()}
+            onValueChange={(value) => setCurrentMonth(parseInt(value))}
+          >
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder={months[currentMonth]} />
+            </SelectTrigger>
+            <SelectContent>
+              {months.map((month, index) => (
+                <SelectItem key={month} value={index.toString()}>
+                  {month}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          <Select
+            value={currentYear.toString()}
+            onValueChange={(value) => setCurrentYear(parseInt(value))}
+          >
+            <SelectTrigger className="w-[120px]">
+              <SelectValue placeholder={currentYear.toString()} />
+            </SelectTrigger>
+            <SelectContent>
+              {years.map((year) => (
+                <SelectItem key={year} value={year.toString()}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <Button variant="ghost" size="icon" onClick={handleNextMonth} className="rtl-flip">
+          <ChevronRight className="h-5 w-5" />
+        </Button>
       </div>
       
-      <Button variant="ghost" size="icon" onClick={handleNextMonth} className="rtl-flip">
-        <ChevronRight className="h-5 w-5" />
-      </Button>
+      {/* Financial month range explanation */}
+      <div className="text-sm text-center text-muted-foreground">
+        חודש פיננסי: {financialMonthRange}
+      </div>
     </div>
   );
 }

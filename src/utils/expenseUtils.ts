@@ -115,13 +115,74 @@ export const createRecurringExpenseFromForm = (formData: ExpenseFormData, userId
 };
 
 /**
- * Filter expenses for a specific month and year
+ * Filter expenses for a specific financial month and year
+ * Financial month is defined by start day (e.g., if start day is 11, 
+ * financial month of May is from May 11 to June 10)
  */
-export const filterExpensesByMonth = (expenses: Expense[], month: number, year: number): Expense[] => {
+export const filterExpensesByMonth = (
+  expenses: Expense[], 
+  month: number, 
+  year: number,
+  financialMonthStartDay: number
+): Expense[] => {
+  // Calculate financial month boundaries
+  const startDate = new Date(year, month, financialMonthStartDay);
+  const endDate = new Date(year, month + 1, financialMonthStartDay);
+  
   return expenses.filter((expense) => {
-    const date = new Date(expense.date);
-    return date.getMonth() === month && date.getFullYear() === year;
+    const expenseDate = new Date(expense.date);
+    
+    // Check if expense date is within the financial month boundaries
+    return expenseDate >= startDate && expenseDate < endDate;
   });
+};
+
+/**
+ * Get the current financial month and year based on the financial month start day
+ */
+export const getCurrentFinancialMonth = (financialMonthStartDay: number): { month: number; year: number } => {
+  const today = new Date();
+  const currentMonth = today.getMonth(); // 0-11
+  const currentYear = today.getFullYear();
+  const currentDay = today.getDate(); // 1-31
+  
+  // If today's date is before the financial month start day, use previous month
+  if (currentDay < financialMonthStartDay) {
+    // For January (0), go to previous year's December (11)
+    if (currentMonth === 0) {
+      return { month: 11, year: currentYear - 1 };
+    } else {
+      return { month: currentMonth - 1, year: currentYear };
+    }
+  }
+  
+  // Otherwise, use current month
+  return { month: currentMonth, year: currentYear };
+};
+
+/**
+ * Format financial month range for display (e.g., "May 11 - Jun 10")
+ */
+export const formatFinancialMonthRange = (
+  month: number, 
+  year: number,
+  financialMonthStartDay: number
+): string => {
+  // Month names in Hebrew
+  const monthNames = [
+    'ינואר', 'פברואר', 'מרץ', 'אפריל', 
+    'מאי', 'יוני', 'יולי', 'אוגוסט', 
+    'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'
+  ];
+  
+  // Start date of the financial month
+  const startDate = new Date(year, month, financialMonthStartDay);
+  
+  // End date is the day before the start of the next financial month
+  const endDate = new Date(year, month + 1, financialMonthStartDay - 1);
+  
+  // Format: "May 11 - Jun 10"
+  return `${monthNames[startDate.getMonth()]} ${startDate.getDate()} - ${monthNames[endDate.getMonth()]} ${endDate.getDate()}`;
 };
 
 /**
