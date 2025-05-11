@@ -1,7 +1,7 @@
 
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { InfoCircle } from "lucide-react";
+import { Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface RememberMeCheckboxProps {
@@ -30,7 +30,7 @@ export function RememberMeCheckbox({
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger type="button">
-              <InfoCircle className="h-3.5 w-3.5 text-muted-foreground" />
+              <Info className="h-3.5 w-3.5 text-muted-foreground" />
             </TooltipTrigger>
             <TooltipContent>
               <p className="max-w-xs">
