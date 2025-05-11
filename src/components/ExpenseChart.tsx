@@ -15,11 +15,11 @@ type ChartDataItem = {
 type ViewMode = "category" | "source";
 
 export function ExpenseChart({ onSliceClick }: { onSliceClick?: (id: string, type: ViewMode) => void }) {
-  const { expenses, categories, paymentSources, currentMonth, currentYear } = useAppStore();
+  const { expenses, categories, paymentSources, currentMonth, currentYear, financialMonthStartDay } = useAppStore();
   const [viewMode, setViewMode] = useState<ViewMode>("category");
 
-  // Filter expenses for current month
-  const filteredExpenses = filterExpensesByMonth(expenses, currentMonth, currentYear);
+  // Filter expenses for current month - now with financialMonthStartDay parameter
+  const filteredExpenses = filterExpensesByMonth(expenses, currentMonth, currentYear, financialMonthStartDay);
 
   // Calculate data for the chart based on view mode
   const calculateChartData = (): ChartDataItem[] => {
