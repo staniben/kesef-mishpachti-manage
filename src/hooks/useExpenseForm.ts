@@ -31,7 +31,10 @@ export function useExpenseForm(editId?: string, initialData?: InitialData) {
     expenses, 
     addExpense, 
     updateExpense, 
-    addMultipleExpenses 
+    addMultipleExpenses,
+    fetchCategories,
+    fetchPaymentSources,
+    refreshAllData
   } = useAppStore();
   
   const { handleSingleExpense } = useSingleExpenseHandler();
@@ -53,6 +56,34 @@ export function useExpenseForm(editId?: string, initialData?: InitialData) {
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [dataLoadAttempts, setDataLoadAttempts] = useState(0);
+  
+  // Check if required data is loaded
+  const isDataMissing = categories.length === 0 || paymentSources.length === 0;
+  
+  // Try to load data if missing
+  useEffect(() => {
+    const loadRequiredData = async () => {
+      if (isDataMissing && dataLoadAttempts < 3 && user) {
+        console.log("ExpenseForm: Required data missing, loading data (attempt", dataLoadAttempts + 1, ")");
+        setIsLoadingData(true);
+        
+        try {
+          await refreshAllData();
+          console.log("ExpenseForm: Data refreshed successfully");
+        } catch (error) {
+          console.error("ExpenseForm: Error loading data:", error);
+          // Increment attempt counter for retry logic
+          setDataLoadAttempts(prev => prev + 1);
+        } finally {
+          setIsLoadingData(false);
+        }
+      }
+    };
+    
+    loadRequiredData();
+  }, [isDataMissing, dataLoadAttempts, user, refreshAllData]);
   
   // Apply initialData if provided
   useEffect(() => {
@@ -118,10 +149,9 @@ export function useExpenseForm(editId?: string, initialData?: InitialData) {
   // Effect to log initial data for debugging
   useEffect(() => {
     console.log("ExpenseForm initialized with user:", user?.id);
-    console.log("Available categories:", categories);
-    console.log("Available payment sources:", paymentSources);
-    console.log("Initial form data:", formData);
-  }, []);
+    console.log("Available categories:", categories.length);
+    console.log("Available payment sources:", paymentSources.length);
+  }, [categories, paymentSources, user]);
   
   // Effect to update form data when categories or payment sources change
   useEffect(() => {
@@ -336,6 +366,8 @@ export function useExpenseForm(editId?: string, initialData?: InitialData) {
   return {
     formData,
     isSubmitting,
+    isLoadingData,
+    isDataMissing,
     categories,
     paymentSources,
     handleChange,

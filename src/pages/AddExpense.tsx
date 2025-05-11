@@ -1,18 +1,19 @@
-
 import { useEffect, useState } from "react";
 import { ExpenseForm } from "@/components/ExpenseForm";
 import { useAppStore } from "@/store";
-import { Loader2, AlertTriangle, CheckCircle2, Info } from "lucide-react";
+import { Loader2, AlertTriangle, CheckCircle2, Info, RefreshCw } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { checkRlsAccess } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useSearchParams } from "react-router-dom";
 import { PaymentType } from "@/types";
 
 export default function AddExpense() {
-  const { categories, paymentSources, fetchCategories, fetchPaymentSources } = useAppStore();
+  const { categories, paymentSources, fetchCategories, fetchPaymentSources, refreshAllData, dataStatus } = useAppStore();
   const [isLoading, setIsLoading] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const { user, isAuthenticated } = useAuth();
   const [rlsStatus, setRlsStatus] = useState<string>('checking');
@@ -80,26 +81,47 @@ export default function AddExpense() {
     checkAccess();
   }, [user]);
 
+  // Data loading effect with retry logic
   useEffect(() => {
     const loadData = async () => {
+      if (!isAuthenticated) {
+        console.warn("AddExpense: User not authenticated");
+        setError("יש להתחבר למערכת כדי להוסיף הוצאה");
+        setIsLoading(false);
+        return;
+      }
+      
       setIsLoading(true);
       setError(null);
       
       try {
         console.log("AddExpense: Loading data with user:", user?.id);
         console.log("AddExpense: User authenticated:", isAuthenticated);
+        console.log("AddExpense: Current data status:", dataStatus);
         
-        // Ensure categories and payment sources are loaded
-        if (categories.length === 0) {
-          console.log("AddExpense: No categories found, fetching...");
-          await fetchCategories();
-          console.log("AddExpense: Categories after fetch:", categories.length);
+        // If data is already loading from elsewhere, wait for it
+        if (dataStatus === 'loading') {
+          console.log("AddExpense: Data is already loading, waiting...");
+          
+          // Wait a bit to see if data finishes loading
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Check if data is still loading
+          if (dataStatus === 'loading' && retryCount < 5) {
+            setRetryCount(prevCount => prevCount + 1);
+            return; // Exit and let next effect iteration handle retry
+          }
         }
         
-        if (paymentSources.length === 0) {
-          console.log("AddExpense: No payment sources found, fetching...");
-          await fetchPaymentSources();
-          console.log("AddExpense: Payment sources after fetch:", paymentSources.length);
+        // Ensure categories and payment sources are loaded
+        if (categories.length === 0 || paymentSources.length === 0) {
+          console.log(`AddExpense: Missing data. Categories: ${categories.length}, Payment sources: ${paymentSources.length}`);
+          
+          // Force refresh all data
+          console.log("AddExpense: Forcing data refresh...");
+          await refreshAllData();
+          
+          console.log(`AddExpense: After refresh - Categories: ${categories.length}, Payment sources: ${paymentSources.length}`);
         }
         
         if (categories.length === 0) {
@@ -111,11 +133,6 @@ export default function AddExpense() {
           console.warn("AddExpense: Still no payment sources after fetch");
           setError("לא נמצאו אמצעי תשלום. אנא צור אמצעי תשלום לפני הוספת הוצאה");
         }
-        
-        if (!isAuthenticated) {
-          console.warn("AddExpense: User not authenticated");
-          setError("יש להתחבר למערכת כדי להוסיף הוצאה");
-        }
       } catch (error) {
         console.error("Error loading data:", error);
         setError("אירעה שגיאה בטעינת הנתונים");
@@ -125,7 +142,17 @@ export default function AddExpense() {
     };
 
     loadData();
-  }, [categories.length, paymentSources.length, fetchCategories, fetchPaymentSources, user, isAuthenticated]);
+  }, [categories.length, paymentSources.length, fetchCategories, fetchPaymentSources, refreshAllData, user, isAuthenticated, dataStatus, retryCount]);
+
+  // Force retry data loading if retryCount changes
+  useEffect(() => {
+    if (retryCount > 0 && retryCount <= 5) {
+      const timer = setTimeout(() => {
+        console.log(`AddExpense: Data retry attempt ${retryCount}...`);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [retryCount]);
 
   // Add handler to retry RLS check
   const handleRetryRlsCheck = async () => {
@@ -175,10 +202,64 @@ export default function AddExpense() {
     }
   };
 
+  // Add handler to retry data loading
+  const handleRetryDataLoading = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      toast({
+        title: "מרענן נתונים",
+        description: "מנסה לטעון נתונים מחדש...",
+      });
+      
+      await refreshAllData();
+      
+      if (categories.length === 0) {
+        setError("לא נמצאו קטגוריות. אנא צור קטגוריות לפני הוספת הוצאה");
+      }
+      
+      if (paymentSources.length === 0) {
+        setError("לא נמצאו אמצעי תשלום. אנא צור אמצעי תשלום לפני הוספת הוצאה");
+      }
+      
+      if (categories.length > 0 && paymentSources.length > 0) {
+        toast({
+          title: "רענון הצליח",
+          description: "הנתונים נטענו בהצלחה",
+        });
+      }
+    } catch (error) {
+      console.error("Error retrying data load:", error);
+      setError("אירעה שגיאה בטעינת הנתונים");
+      toast({
+        title: "שגיאה",
+        description: "אירעה שגיאה בטעינת הנתונים",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">טוען נתונים...</p>
+          
+          {retryCount > 2 && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="mt-4"
+              onClick={handleRetryDataLoading}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              נסה שוב
+            </Button>
+          )}
+        </div>
       </div>
     );
   }
@@ -189,7 +270,17 @@ export default function AddExpense() {
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>שגיאה</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription className="space-y-2">
+            <p>{error}</p>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleRetryDataLoading}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              נסה שוב
+            </Button>
+          </AlertDescription>
         </Alert>
       )}
       
@@ -321,7 +412,6 @@ export default function AddExpense() {
             <div className="text-sm text-muted-foreground mb-1">אמצעי תשלום זמינים: {paymentSources.length}</div>
           </div>
           
-          {/* Show diagnostic info but don't prevent form usage */}
           {(rlsStatus !== 'ok' && rlsStatus !== 'checking' && rlsStatus !== 'no-user') && (
             <Alert>
               <Info className="h-4 w-4" />

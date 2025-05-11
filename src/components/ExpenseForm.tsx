@@ -1,4 +1,3 @@
-
 import React from "react";
 import { BasicExpenseFields } from "./expense/BasicExpenseFields";
 import { DateTimeInputs } from "./expense/DateTimeInputs";
@@ -8,6 +7,7 @@ import { InstallmentFields } from "./expense/InstallmentFields";
 import { RecurringFields } from "./expense/RecurringFields";
 import { useExpenseForm } from "@/hooks/useExpenseForm";
 import { PaymentType } from "@/types";
+import { Loader2 } from "lucide-react";
 
 interface ExpenseFormProps {
   editId?: string;
@@ -26,6 +26,8 @@ export function ExpenseForm({ editId, initialData }: ExpenseFormProps) {
   const {
     formData,
     isSubmitting,
+    isLoadingData,
+    isDataMissing,
     categories,
     paymentSources,
     handleChange,
@@ -35,6 +37,53 @@ export function ExpenseForm({ editId, initialData }: ExpenseFormProps) {
     handlePaymentTypeChange,
     handleSubmit
   } = useExpenseForm(editId, initialData);
+  
+  // Show loading state when initializing data
+  if (isLoadingData) {
+    return (
+      <div className="space-y-6 bg-card p-6 rounded-lg shadow-sm">
+        <h2 className="text-2xl font-bold mb-6">{editId ? "עריכת הוצאה" : "הוספת הוצאה חדשה"}</h2>
+        <div className="flex flex-col items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin mb-4" />
+          <p className="text-muted-foreground">טוען נתונים...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Show placeholder state when data is missing (categories or payment sources)
+  if (isDataMissing) {
+    return (
+      <div className="space-y-6 bg-card p-6 rounded-lg shadow-sm">
+        <h2 className="text-2xl font-bold mb-6">{editId ? "עריכת הוצאה" : "הוספת הוצאה חדשה"}</h2>
+        <div className="border border-dashed border-muted-foreground/50 p-6 rounded-md bg-muted/20">
+          <div className="text-center space-y-2">
+            <p className="font-medium">לא ניתן להציג את הטופס</p>
+            <p className="text-sm text-muted-foreground">
+              {categories.length === 0 ? 'נדרשות קטגוריות ' : ''}
+              {categories.length === 0 && paymentSources.length === 0 ? 'ו' : ''}
+              {paymentSources.length === 0 ? 'נדרשים אמצעי תשלום ' : ''}
+              כדי להוסיף הוצאה
+            </p>
+            <div className="pt-4">
+              <a 
+                href="/categories" 
+                className="text-sm text-primary hover:underline mx-2"
+              >
+                הוסף קטגוריות
+              </a>
+              <a 
+                href="/payment-sources" 
+                className="text-sm text-primary hover:underline mx-2"
+              >
+                הוסף אמצעי תשלום
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <form onSubmit={handleSubmit} className="space-y-6 bg-card p-6 rounded-lg shadow-sm">

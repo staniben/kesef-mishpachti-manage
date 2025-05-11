@@ -6,16 +6,25 @@ import { categoryService } from '@/services/categoryService';
 import { paymentSourceService } from '@/services/paymentSourceService';
 import { devtools } from 'zustand/middleware';
 
+// Data status type to track loading state
+type DataStatus = 'idle' | 'loading' | 'ready' | 'error';
+
 interface StoreState {
   // Data
   expenses: Expense[];
   categories: ExpenseCategory[];
   paymentSources: PaymentSource[];
   
+  // Data status
+  dataStatus: DataStatus;
+  
   // UI state
   currentMonth: number;
   currentYear: number;
   theme: ThemeType;
+  
+  // Actions - Data Status
+  setStoreDataStatus: (status: DataStatus) => void;
   
   // Actions - Expenses
   fetchExpenses: () => Promise<void>;
@@ -53,9 +62,16 @@ export const useAppStore = create<StoreState>()(
       expenses: [],
       categories: [],
       paymentSources: [],
+      dataStatus: 'idle',
       currentMonth: new Date().getMonth(),
       currentYear: new Date().getFullYear(),
       theme: 'default',
+      
+      // Data status actions
+      setStoreDataStatus: (status) => {
+        console.log(`Setting store data status to: ${status}`);
+        set({ dataStatus: status });
+      },
       
       // Expense actions
       fetchExpenses: async () => {
@@ -243,15 +259,21 @@ export const useAppStore = create<StoreState>()(
       refreshAllData: async () => {
         console.log("Refreshing all data from server...");
         try {
+          // Update data status
+          get().setStoreDataStatus('loading');
+          
           // Fetch all data in parallel for faster refresh
           await Promise.all([
             get().fetchCategories(),
             get().fetchPaymentSources(),
             get().fetchExpenses()
           ]);
+          
           console.log("All data refreshed successfully");
+          get().setStoreDataStatus('ready');
         } catch (error) {
           console.error("Error refreshing data:", error);
+          get().setStoreDataStatus('error');
           throw error;
         }
       },
@@ -261,7 +283,8 @@ export const useAppStore = create<StoreState>()(
         set({
           expenses: [],
           categories: [],
-          paymentSources: []
+          paymentSources: [],
+          dataStatus: 'idle'
         });
       }
     }),
